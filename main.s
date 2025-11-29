@@ -1,24 +1,115 @@
 	%define	DISK_ID			0x12345678
-	%define	Sector_per_track	63
-	%define	Track_per_cylinder	1024
-	%define	Number_of_head		16
-
 
 	org 0x7c00	; this code is loaded at 0x7c00 in memory
 	bits 16		; targeting 16 bit
 
 ; start
-test:
-	; clear registers
-	xor	ax, ax	; 0 AX
-	mov	ds, ax	; Set Data Segment to 0
-	mov	es, ax	; Set Extra Segment to 0
-	mov	ss, ax	; Set Stack Segment to 0
-	mov	sp, ax	; Set Stack Pointer to 0
+	; switch video mode
+	mov	ax, 0x0003	; ah = 0, al = video mode
+	int	0x10
+
+	cli	; disable interupts
+
+	; set data segment to 0
+	mov	ax, 0
+	mov	ds, ax
+
+	lgdt[gdt_descriptor]
+
+	; switch to protected mode
+	mov	eax, cr0
+	or eax, 0x1
+	mov	cr0, eax
+	
+	; jump to 32 bit code (clear pipeline)
+	jmp CODE_SEG:start32
 
 
-exit:	jmp	$	; stop execution
+	; data for 16 bit part of the bootloaders
+	; Global Descriptor Table
+gdt_descriptor:
+	dw	gdt_start - gdt_end - 1	; size
+	dd	gdt_start		; start of gdt entries
 
+gdt_start:
+
+gdt_null:	; entry 0 (Null)
+	dq	0		; filled with 0
+
+gdt_code:	; entry 1 (Code segment)
+	dw	0xffff		; limit (0-15)
+	dw	0x0000		; base (0-15)
+	db	0x00		; base (16-23)
+	db	0b10011010	; access byte
+	db	0b11001111	; b7-4: flags | b3-0: limit (16-19)
+	db	0x00		; base (24-31)
+
+gdt_data:	; entry 2 (Data segment)
+	dw	0xffff		; limit (0-15)
+	dw	0x0000		; base (0-15)
+	db	0x00		; base (16-23)
+	db	0b10010010	; access byte
+	db	0b11001111	; limit (16-19) | flags
+	db	0x00		; base (24-31)
+gdt_end:
+
+	; get offset for segments
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
+
+
+	; protected mode section
+	bits 32
+
+	%define VIDEO_MEMORY 0xb8000
+
+start32:
+	; setup segmentation
+	mov	ax, DATA_SEG
+	mov	ds, ax
+	mov	es, ax
+	mov	fs, ax
+	mov	gs, ax
+	mov	ss, ax
+
+	; print hello world
+	mov	edi, VIDEO_MEMORY
+
+	mov	ebx, hello
+	mov	ah, 0x0f
+	call print
+
+	jmp $
+
+	; functions
+
+print:
+	; string pointer in ebx
+	; string is null terminated
+	; screen pointer in edi
+	; color in ah
+	; modify al, ebx
+
+	mov	al, [ebx]
+	cmp	al, 0
+	je	ret
+	call	echo
+	inc	ebx
+	jmp	print
+
+echo:
+	; char to print in ax (char and color)
+	; screen pointer in edi
+
+	mov	[edi], ax
+	add	edi, 2
+
+ret:	ret
+
+
+
+	; data
+hello:	db	'Hello World!', 0
 
 ; fill the file with 0
 times 440-($-$$) db 0
