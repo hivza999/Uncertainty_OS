@@ -4,6 +4,19 @@
 	bits 16		; targeting 16 bit
 
 ; start
+	; get disk
+	mov	[boot_disk], dl
+
+	; load disk
+	mov	ah, 0x02
+	mov	al, 1		; sector count to read
+	mov	ch, 0		; cylinder
+	mov	cl, 2		; sector
+	mov	dh, 0		; head
+	mov	bx, 0x1000	; buffer
+	mov	dl, 0x80	; drive select
+	int	0x13		; interupt read disk (ah = 0x02)
+
 	; switch video mode
 	mov	ax, 0x0003	; ah = 0, al = video mode
 	int	0x10
@@ -53,6 +66,9 @@ gdt_data:	; entry 2 (Data segment)
 	db	0x00		; base (24-31)
 gdt_end:
 
+boot_disk:
+	db	0
+
 	; get offset for segments
 CODE_SEG equ gdt_code - gdt_start
 DATA_SEG equ gdt_data - gdt_start
@@ -60,8 +76,6 @@ DATA_SEG equ gdt_data - gdt_start
 
 	; protected mode section
 	bits 32
-
-	%define VIDEO_MEMORY 0xb8000
 
 start32:
 	; setup segmentation
@@ -72,44 +86,7 @@ start32:
 	mov	gs, ax
 	mov	ss, ax
 
-	; print hello world
-	mov	edi, VIDEO_MEMORY
-
-	mov	ebx, hello
-	mov	ah, 0x0f
-	call print
-
-	jmp $
-
-	; functions
-
-print:
-	; string pointer in ebx
-	; string is null terminated
-	; screen pointer in edi
-	; color in ah
-	; modify al, ebx
-
-	mov	al, [ebx]
-	cmp	al, 0
-	je	ret
-	call	echo
-	inc	ebx
-	jmp	print
-
-echo:
-	; char to print in ax (char and color)
-	; screen pointer in edi
-
-	mov	[edi], ax
-	add	edi, 2
-
-ret:	ret
-
-
-
-	; data
-hello:	db	'Hello World!', 0
+	jmp 0x1000
 
 ; fill the file with 0
 times 440-($-$$) db 0
