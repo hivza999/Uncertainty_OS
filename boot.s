@@ -21,6 +21,11 @@
 	mov	ax, 0x0003	; ah = 0, al = video mode
 	int	0x10
 
+	; disable cursor
+	mov	cx, 0x2607
+	mov	ah, 0x01
+	int	0x10
+
 	cli	; disable interupts
 
 	; set data segment to 0
