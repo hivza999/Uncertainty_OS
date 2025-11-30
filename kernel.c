@@ -1,5 +1,25 @@
+#define VIDEO_MEMORY 0xb8000
+
+void print(char *string, char color);
+
+int Cursor;
+
 extern void main()
 {
-	*(char *)0xb8000 = 'H';
+	Cursor = VIDEO_MEMORY;
+
+	char *message = "Hello World!";
+	print(message, 0x0f);
 	return;
+}
+
+void print(char *string, char color)
+{
+	while (string[0])
+	{
+		*(char *)(Cursor) = string[0];
+		*(char *)(Cursor + 1) = color;
+		Cursor += 2;
+		string++;
+	}
 }
