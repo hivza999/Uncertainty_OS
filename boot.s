@@ -1,21 +1,20 @@
 	%define	DISK_ID			0x12345678
+	%define	kernel_location	0x1000
 
 	org 0x7c00	; this code is loaded at 0x7c00 in memory
 	bits 16		; targeting 16 bit
 
 ; start
-	; get disk
-	mov	[boot_disk], dl
 
 	; load disk
 	mov	ah, 0x02
-	mov	al, 1		; sector count to read
-	mov	ch, 0		; cylinder
-	mov	cl, 2		; sector
-	mov	dh, 0		; head
-	mov	bx, 0x1000	; buffer
-	mov	dl, 0x80	; drive select
-	int	0x13		; interupt read disk (ah = 0x02)
+	mov	al, 1			; sector count to read
+	mov	ch, 0			; cylinder
+	mov	cl, 2			; sector
+	mov	dh, 0			; head
+	mov	bx, kernel_location	; buffer
+					; drive select (already in dl)
+	int	0x13			; interupt read disk (ah = 0x02)
 
 	; switch video mode
 	mov	ax, 0x0003	; ah = 0, al = video mode
@@ -36,7 +35,7 @@
 
 	; switch to protected mode
 	mov	eax, cr0
-	or eax, 0x1
+	or	eax, 0x1
 	mov	cr0, eax
 	
 	; jump to 32 bit code (clear pipeline)
@@ -91,7 +90,7 @@ start32:
 	mov	gs, ax
 	mov	ss, ax
 
-	jmp 0x1000
+	jmp	kernel_location
 
 ; fill the file with 0
 times 440-($-$$) db 0

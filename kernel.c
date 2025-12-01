@@ -20,7 +20,7 @@ void print(char *string, char color)
 		*(char *)(Cursor) = string[0];
 		*(char *)(Cursor + 1) = color;
 		Cursor += 2;
-		*(char *)(Cursor + 1) = 0x10; // cursor color
+		*(char *)(Cursor + 1) = 0xf0; // cursor color
 		string++;
 	}
 }
