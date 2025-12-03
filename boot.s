@@ -1,14 +1,14 @@
 	%define	DISK_ID			0x12345678
-	%define	kernel_location	0x1000
+	%define	kernel_location		0x1000
 
 	org 0x7c00	; this code is loaded at 0x7c00 in memory
 	bits 16		; targeting 16 bit
 
 ; start
 
-	; load disk
+	; load kernel
 	mov	ah, 0x02
-	mov	al, 1			; sector count to read
+	mov	al, 6			; sector count to read
 	mov	ch, 0			; cylinder
 	mov	cl, 2			; sector
 	mov	dh, 0			; head
@@ -31,7 +31,7 @@
 	mov	ax, 0
 	mov	ds, ax
 
-	lgdt[gdt_descriptor]
+	lgdt	[gdt_descriptor]
 
 	; switch to protected mode
 	mov	eax, cr0
