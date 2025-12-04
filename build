@@ -9,7 +9,20 @@ nasm src/boot.s -f bin -o bin/tmp/boot.img
 
 nasm "src/kernel_entry.asm" -f elf -o "bin/tmp/kernel_entry.o"
 ~/cross-compiler/i386-elf-15.2.0-Linux-x86_64/bin/i386-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
-i386-elf-ld -o bin/tmp/kernel.bin -Ttext 0x1000 'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' --oformat binary
+
+# Iterrupts
+mkdir bin/tmp/interrupts
+~/cross-compiler/i386-elf-15.2.0-Linux-x86_64/bin/i386-elf-gcc -ffreestanding -m32 -g -c 'src/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
+
+nasm "src/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
+
+# link
+~/cross-compiler/i386-elf-15.2.0-Linux-x86_64/bin/i386-elf-ld -o bin/tmp/kernel.bin -Ttext 0x1000 \
+\
+'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
+'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' \
+\
+--oformat binary
 
 cat bin/tmp/boot.img bin/tmp/kernel.bin > bin/os.img
 

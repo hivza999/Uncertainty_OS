@@ -8,7 +8,7 @@
 
 	; load kernel
 	mov	ah, 0x02
-	mov	al, 6			; sector count to read
+	mov	al, 10			; sector count to read
 	mov	ch, 0			; cylinder
 	mov	cl, 2			; sector
 	mov	dh, 0			; head
