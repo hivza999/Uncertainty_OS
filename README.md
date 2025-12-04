@@ -1,8 +1,16 @@
-# Welcome
+# Welcome to Uncertainty OS
 
-Making my own 32 bit OS for learning purpurse
+This is what i do with my insanity
 
-## Why do I do that?
+---
 
-This project is for learning purpuse\
-And because I find this fun
+Directories:
+
+src/\
+contain source file of the OS
+
+bin/\
+contain build of the OS
+
+build\
+run this to build the os

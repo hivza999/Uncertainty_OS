@@ -13,8 +13,7 @@ extern void main()
 {
 	Cursor = VIDEO_MEMORY + 80 * 2 * 2;
 
-	char *message = "Hello World!";
-	print(message, 0x0f);
+	print("Welcome to Uncertainty OS!", 0x0f);
 
 	idt_init();
 
@@ -23,7 +22,7 @@ extern void main()
 
 	for (int i = 0; true; i++)
 	{
-		Cursor = VIDEO_MEMORY + 80 * 2 * 2 + 2 * 20;
+		Cursor = VIDEO_MEMORY + 80 * 2 * 2 + 2 * 40;
 
 		hexprint((i >> 28) & 0x0f, 0x0f);
 		hexprint((i >> 24) & 0x0f, 0x0f);
