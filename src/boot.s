@@ -1,5 +1,5 @@
 	%define	DISK_ID			0x12345678
-	%define	kernel_location		0x1000
+	%define	kernel_location		0x0500
 
 	org 0x7c00	; this code is loaded at 0x7c00 in memory
 	bits 16		; targeting 16 bit

@@ -19,7 +19,7 @@ i686-elf-gcc -ffreestanding -m32 -g -c 'src/interrupts/idt.c' -o bin/tmp/interru
 nasm "src/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
 
 # link
-i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x1000 \
+i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x0500 \
 \
 'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
 'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' \

@@ -79,27 +79,66 @@ isr_stub_8: ; Programmable Interval Timer
 	%define	PS_2_data	0x60
 	%define	PS_2_cmd	0x64
 
+	%define Scancode_set	0x9f000
+
+	%define Keycode_buffer	 0x9f100
+	%define Keycode_register 0x9f200
+	%define Keycode_status 0x9f201
+
 isr_stub_9: ; keyboard input
 	pushad
 
-	mov	al, 9
+	xor	eax, eax
+	xor	ebx, ebx
 
-	in	al, PS_2_data ; get scan code
+	in	al, PS_2_data
+
+	; heck if it is a extended byte
+	mov	bh, [Keycode_status]
+	and	bh, 0b00000001
+	jnz	irq1_extended_byte
+
+	; extended byte detected
+	cmp	al, 0xe0
+	je	irq1_extend_byte
+
+	; ignore if it is key release
 	or	al, al
+	js	irq1_exit
 
-	js	skip_echo
+	; get keycode
+	mov	cl, [Scancode_set + eax]
 
-	mov	edx, [0x2000]
-	call	echo_hexb
-	mov	[0x2000], edx
+	; store keycode
+	mov	bl, [Keycode_register]
+	mov	[ebx + Keycode_buffer], cl
+	
+	inc	bl
+	mov	[Keycode_register], bl
 
-skip_echo:
+
+irq1_exit:
+
 	mov	al, 0x20
 	out	0x20, al
 	
 	popad
 	sti
 	iret
+
+irq1_extend_byte:
+	mov	bh, [Keycode_status]
+	or	bh, 0b00000001
+	mov	[Keycode_status], bh
+	jmp	irq1_exit
+
+
+irq1_extended_byte:
+	mov	bh, [Keycode_status]
+	and	bh, 0b11111110
+	mov	[Keycode_status], bh
+	jmp	irq1_exit
+
 
 isr_stub_10:
 	pushad

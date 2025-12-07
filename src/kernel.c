@@ -5,33 +5,32 @@
 #define VIDEO_MEMORY 0xb8000
 
 void print(char *string, uint8_t color);
+void hexprint8(uint8_t value, uint8_t color);
 void hexprint(uint8_t digit, uint8_t color);
 
 int Cursor;
 
+uint8_t *keycode_register = (uint8_t *)0x9f200;
+uint8_t *keycode_buffer = (uint8_t *)0x9f100;
+
 extern void main()
 {
+	uint8_t local_keycode_register = *keycode_register;
+
 	Cursor = VIDEO_MEMORY + 80 * 2 * 2;
 
 	print("Welcome to Uncertainty OS!", 0x0f);
 
-	idt_init();
+	Cursor = VIDEO_MEMORY + 80 * 2 * 4;
 
-	char buffer[9];
-	buffer[8] = 0;
-
-	for (int i = 0; true; i++)
+	while (true)
 	{
-		Cursor = VIDEO_MEMORY + 80 * 2 * 2 + 2 * 40;
 
-		hexprint((i >> 28) & 0x0f, 0x0f);
-		hexprint((i >> 24) & 0x0f, 0x0f);
-		hexprint((i >> 20) & 0x0f, 0x0f);
-		hexprint((i >> 16) & 0x0f, 0x0f);
-		hexprint((i >> 12) & 0x0f, 0x0f);
-		hexprint((i >> 8) & 0x0f, 0x0f);
-		hexprint((i >> 4) & 0x0f, 0x0f);
-		hexprint((i) & 0x0f, 0x0f);
+		while (*keycode_register != local_keycode_register)
+		{
+			hexprint8(keycode_buffer[local_keycode_register], 0x0f);
+			local_keycode_register++;
+		}
 	}
 
 	return;
@@ -46,6 +45,12 @@ void print(char *string, uint8_t color)
 		Cursor += 2;
 		string++;
 	}
+}
+
+void hexprint8(uint8_t value, uint8_t color)
+{
+	hexprint(value >> 4, color);
+	hexprint(value & 0x0f, color);
 }
 
 void hexprint(uint8_t digit, uint8_t color)
