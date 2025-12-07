@@ -2,12 +2,16 @@
 	global	_start
 
 	section .text
+
+	%define	Keycode_register	0x9f000
+	%define Keycode_status		0x9f001
+	%define	Scancode_set 0x9f100
 _start:
 	; Initialization
 
 	; keycode table initialization
 	mov	esi, scancodeset1
-	mov	edi, 0x9f000
+	mov	edi, Scancode_set
 
 scancodeset1_initialization_loop:
 	mov	edx, [esi]
@@ -20,17 +24,15 @@ scancodeset1_initialization_loop:
 	jb	scancodeset1_initialization_loop
 
 	; Initialize keycode registers
-	%define Keycode_register 0x9f200
-	%define Keycode_status 0x9f201
+
 	mov	byte [Keycode_register], 0x00
 	mov	byte [Keycode_status], 0x00
 
-
-	mov	dword [0x2000], 0xb8280
-
+	; init idt
 	extern idt_init
 	call idt_init
 
+	; start main kernel
 	extern main
 	call main
 	jmp $

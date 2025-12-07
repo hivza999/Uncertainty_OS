@@ -79,11 +79,11 @@ isr_stub_8: ; Programmable Interval Timer
 	%define	PS_2_data	0x60
 	%define	PS_2_cmd	0x64
 
-	%define Scancode_set	0x9f000
+	%define Scancode_set	0x9f100
 
-	%define Keycode_buffer	 0x9f100
-	%define Keycode_register 0x9f200
-	%define Keycode_status	 0x9f201
+	%define Keycode_buffer	 0x9f200
+	%define Keycode_register 0x9f000
+	%define Keycode_status	 0x9f001
 
 isr_stub_9: ; keyboard input
 	pushad
