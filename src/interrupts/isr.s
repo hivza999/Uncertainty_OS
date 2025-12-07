@@ -83,7 +83,7 @@ isr_stub_8: ; Programmable Interval Timer
 
 	%define Keycode_buffer	 0x9f100
 	%define Keycode_register 0x9f200
-	%define Keycode_status 0x9f201
+	%define Keycode_status	 0x9f201
 
 isr_stub_9: ; keyboard input
 	pushad
@@ -92,19 +92,24 @@ isr_stub_9: ; keyboard input
 	xor	ebx, ebx
 
 	in	al, PS_2_data
-
-	; heck if it is a extended byte
-	mov	bh, [Keycode_status]
-	and	bh, 0b00000001
-	jnz	irq1_extended_byte
-
 	; extended byte detected
 	cmp	al, 0xe0
 	je	irq1_extend_byte
 
 	; ignore if it is key release
 	or	al, al
-	js	irq1_exit
+	js	irq1_release
+
+	; check if it is a extended byte
+	mov	bh, [Keycode_status]
+	cmp	bh, 0b00000001
+	je	irq1_extended_byte
+irq1_extended_byte_ret:
+
+	; reset extended byte
+	mov	bh, [Keycode_status]
+	and	bh, 0b11111110
+	mov	[Keycode_status], bh
 
 	; get keycode
 	mov	cl, [Scancode_set + eax]
@@ -126,6 +131,12 @@ irq1_exit:
 	sti
 	iret
 
+irq1_release:
+	mov	bh, [Keycode_status]
+	and	bh, 0b11111110
+	mov	[Keycode_status], bh
+	jmp	irq1_exit
+
 irq1_extend_byte:
 	mov	bh, [Keycode_status]
 	or	bh, 0b00000001
@@ -134,10 +145,8 @@ irq1_extend_byte:
 
 
 irq1_extended_byte:
-	mov	bh, [Keycode_status]
-	and	bh, 0b11111110
-	mov	[Keycode_status], bh
-	jmp	irq1_exit
+	or	al, 0x80
+	jmp	irq1_extended_byte_ret
 
 
 isr_stub_10:
