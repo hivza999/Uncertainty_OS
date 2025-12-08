@@ -79,48 +79,94 @@ isr_stub_8: ; Programmable Interval Timer
 	%define	PS_2_data	0x60
 	%define	PS_2_cmd	0x64
 
-	%define Scancode_set	0x9f100
+	%define Scancode_set		0x9f100
+	%define ASCII_layout		0x9f200
 
-	%define Keycode_buffer	 0x9f200
-	%define Keycode_register 0x9f000
-	%define Keycode_status	 0x9f001
+	%define Keycode_buffer		0x9f400
+	%define Keycode_register	0x9f002
+	%define Keyboard_status		0x9f000
+
+	%define Keyboard_modifier_keys	0x9f001
+	%define ASCII_input_register	0x9f003
+	%define ASCII_buffer		0x9f500
 
 isr_stub_9: ; keyboard input
 	pushad
 
 	xor	eax, eax
 	xor	ebx, ebx
+	xor	ecx, ecx
 
 	in	al, PS_2_data
 	; extended byte detected
 	cmp	al, 0xe0
 	je	irq1_extend_byte
 
+	; Modifier keys:
+
+	; pressed
+	cmp	al, 0x1d	; ctrl
+	je	irq1_modifierkey_crtl_p
+
+	cmp	al, 0x38	; alt
+	je	irq1_modifierkey_alt_p
+
+	cmp	al, 0x2a	; shift
+	je	irq1_modifierkey_shift_p
+
+	cmp	al, 0x3a	; maj lock
+	je	irq1_modifierkey_majlock_p
+
+	; released
+	cmp	al, 0x9d	; ctrl
+	je	irq1_modifierkey_crtl_r
+
+	cmp	al, 0xb8	; alt
+	je	irq1_modifierkey_alt_r
+
+	cmp	al, 0xaa	; shift
+	je	irq1_modifierkey_shift_r
+
+	cmp	al, 0xba	; maj lock
+	je	irq1_modifierkey_majlock_r
+
+irq1_modifierkeys_ret:
+
 	; ignore if it is key release
 	or	al, al
 	js	irq1_release
 
 	; check if it is a extended byte
-	mov	bh, [Keycode_status]
-	cmp	bh, 0b00000001
+	cmp	bl, 0b00000001
 	je	irq1_extended_byte
 irq1_extended_byte_ret:
 
 	; reset extended byte
-	mov	bh, [Keycode_status]
-	and	bh, 0b11111110
-	mov	[Keycode_status], bh
+	mov	bl, [Keyboard_status]
+	and	bl, 0b11111110
+	mov	[Keyboard_status], bl
 
 	; get keycode
 	mov	cl, [Scancode_set + eax]
 
 	; store keycode
 	mov	bl, [Keycode_register]
-	mov	[ebx + Keycode_buffer], cl
+	mov	[ebx + Keycode_buffer], al
 	
 	inc	bl
 	mov	[Keycode_register], bl
 
+
+	; Get ASCII char
+	; get char
+	mov	al, [ASCII_layout + ecx]
+	
+	; store ASCII char
+	mov	bl, [ASCII_input_register]
+	mov	[ebx + ASCII_buffer], al
+	
+	inc	bl
+	mov	[ASCII_input_register], bl
 
 irq1_exit:
 
@@ -132,22 +178,70 @@ irq1_exit:
 	iret
 
 irq1_release:
-	mov	bh, [Keycode_status]
-	and	bh, 0b11111110
-	mov	[Keycode_status], bh
+	mov	bl, [Keyboard_status]
+	and	bl, 0b11111110
+	mov	[Keyboard_status], bl
 	jmp	irq1_exit
 
 irq1_extend_byte:
-	mov	bh, [Keycode_status]
-	or	bh, 0b00000001
-	mov	[Keycode_status], bh
+	mov	bl, [Keyboard_status]
+	or	bl, 0b00000001
+	mov	[Keyboard_status], bl
 	jmp	irq1_exit
-
 
 irq1_extended_byte:
 	or	al, 0x80
 	jmp	irq1_extended_byte_ret
 
+	; pressed
+irq1_modifierkey_crtl_p:
+	mov	bl, [Keyboard_modifier_keys]
+	or	bl, 0b00010000
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_alt_p:
+	mov	bl, [Keyboard_modifier_keys]
+	or	bl, 0b00100000
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_shift_p:
+	mov	bl, [Keyboard_modifier_keys]
+	or	bl, 0b01000000
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_majlock_p:
+	mov	bl, [Keyboard_modifier_keys]
+	or	bl, 0b10000000
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+	; released
+irq1_modifierkey_crtl_r:
+	mov	bl, [Keyboard_modifier_keys]
+	and	bl, 0b11101111
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_alt_r:
+	mov	bl, [Keyboard_modifier_keys]
+	and	bl, 0b11011111
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_shift_r:
+	mov	bl, [Keyboard_modifier_keys]
+	and	bl, 0b10111111
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
+
+irq1_modifierkey_majlock_r:
+	mov	bl, [Keyboard_modifier_keys]
+	and	bl, 0b01111111
+	mov	[Keyboard_modifier_keys], bl
+	jmp	irq1_modifierkeys_ret
 
 isr_stub_10:
 	pushad

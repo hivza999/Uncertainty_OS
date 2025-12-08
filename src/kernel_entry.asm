@@ -3,13 +3,16 @@
 
 	section .text
 
-	%define	Keycode_register	0x9f000
-	%define Keycode_status		0x9f001
-	%define	Scancode_set 0x9f100
+	%define Keycode_status		0x9f000
+	%define	Keycode_register	0x9f002
+	%define ASCII_input_register	0x9f003
+
+	%define	Scancode_set		0x9f100
+
 _start:
 	; Initialization
 
-	; keycode table initialization
+	; keycode table and ASCII layout initialization
 	mov	esi, scancodeset1
 	mov	edi, Scancode_set
 
@@ -20,13 +23,14 @@ scancodeset1_initialization_loop:
 	add	esi, 4
 	add	edi, 4
 
-	cmp	esi, scancodeset1_end
+	cmp	esi, ASCII_layout_QWERTY_end
 	jb	scancodeset1_initialization_loop
 
 	; Initialize keycode registers
 
+	mov	dword [Keycode_status], 0x00
 	mov	byte [Keycode_register], 0x00
-	mov	byte [Keycode_status], 0x00
+	mov	byte [ASCII_input_register], 0x00
 
 	; init idt
 	extern idt_init
@@ -62,3 +66,10 @@ db	0x00, 0x00, 0x00, 0xff, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 db	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 
 scancodeset1_end:
+
+ASCII_layout_QWERTY:
+
+	;  0     1     2     3     4     5     6     7     8     9     a     b     c     d     e     f	   0     1     2     3     4     5     6     7     8     9     a     b     c     d     e     f
+db	0x00, 0x1b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
+
+ASCII_layout_QWERTY_end:
