@@ -12,7 +12,7 @@ void hexprint(uint8_t digit, uint8_t color, uint32_t *p_cursor);
 uint8_t *keyboard_modifier_keys = (uint8_t *)0x9f001;
 
 uint8_t *keycode_register = (uint8_t *)0x9f003;
-uint8_t *keycode_buffer = (uint8_t *)0x9f400;
+uint8_t *keycode_buffer = (uint8_t *)0x9f500;
 
 extern void main()
 {
@@ -33,7 +33,7 @@ extern void main()
 
 		while (*keycode_register != local_keycode_register)
 		{
-			hexprint8(keycode_buffer[local_keycode_register], 0x0f, &Cursor);
+			echo(keycode_buffer[local_keycode_register], 0x0f, &Cursor);
 			local_keycode_register++;
 		}
 	}
