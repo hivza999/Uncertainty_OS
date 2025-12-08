@@ -151,7 +151,7 @@ irq1_extended_byte_ret:
 
 	; store keycode
 	mov	bl, [Keycode_register]
-	mov	[ebx + Keycode_buffer], al
+	mov	[ebx + Keycode_buffer], cl
 	
 	inc	bl
 	mov	[Keycode_register], bl
