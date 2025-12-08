@@ -11,7 +11,7 @@ void hexprint(uint8_t digit, uint8_t color, uint32_t *p_cursor);
 
 uint8_t *keyboard_modifier_keys = (uint8_t *)0x9f001;
 
-uint8_t *keycode_register = (uint8_t *)0x9f002;
+uint8_t *keycode_register = (uint8_t *)0x9f003;
 uint8_t *keycode_buffer = (uint8_t *)0x9f400;
 
 extern void main()
@@ -47,7 +47,6 @@ void print(char *string, uint8_t color, uint32_t *p_cursor)
 	{
 		echo(string[0], color, p_cursor);
 		string++;
-		*p_cursor += 2;
 	}
 }
 
@@ -56,6 +55,7 @@ void echo(char value, uint8_t color, uint32_t *p_cursor)
 
 	*(char *)(*p_cursor) = value;
 	*(uint8_t *)(*p_cursor + 1) = color;
+	*p_cursor += 2;
 }
 
 void hexprint8(uint8_t value, uint8_t color, uint32_t *p_cursor)

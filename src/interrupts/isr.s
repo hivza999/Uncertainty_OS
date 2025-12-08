@@ -161,6 +161,9 @@ irq1_extended_byte_ret:
 	; get char
 	mov	al, [ASCII_layout + ecx]
 	
+	or	al, al
+	jz	irq1_exit
+
 	; store ASCII char
 	mov	bl, [ASCII_input_register]
 	mov	[ebx + ASCII_buffer], al
