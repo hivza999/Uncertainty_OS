@@ -164,15 +164,30 @@ irq1_modifierkeys_ret2:
 	test	ch, 0x3
 	jnz	irq1_exit
 
-	mov	al, ch
+	
+
+
+	mov	al, cl
+	; b4: capslock modifier / b5: numlock
+	shl	al, 3
+
 	mov	ah, ch
-	shr	al, 2	; b2: shift modifier
-	shr	ch, 4	; b4: capslock modifier
 
-	xor	ch, al	; ch > multiply by 256
+	or	al, al
+	js	irq1_modifierkey_jmp0
 
+	shr	ah, 4
+	jmp	irq1_modifierkey_jmp1
 
+irq1_modifierkey_jmp0:
+	shr	ah, 5
 
+irq1_modifierkey_jmp1:
+	shr	ch, 2	; b2: shift modifier
+	
+	xor	ch, ah
+
+	; ch > offset of 256
 	and	ch, 1
 
 get_char:
