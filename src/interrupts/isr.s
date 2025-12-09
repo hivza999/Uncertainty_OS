@@ -130,12 +130,12 @@ irq1_modifierkeys_ret1:
 	js	irq1_release
 
 	; check if it is a extended byte
+	mov	bl, [Keycode_status]
 	cmp	bl, 0b00000001
 	je	irq1_extended_byte
 irq1_extended_byte_ret:
 
 	; reset extended byte
-	mov	bl, [Keycode_status]
 	and	bl, 0b11111110
 	mov	[Keycode_status], bl
 
