@@ -62,11 +62,11 @@ isr_stub_7:
 	sti
 	iret
 
-isr_stub_8: ; Programmable Interval Timer
+isr_stub_8: ; Programmable Interval Timer / IRQ0
 	pushad
 
 	mov	al, 8
-	call	exception_handler
+	;call	exception_handler
 
 	mov	al, 0x20
 	out	0x20, al
@@ -75,22 +75,22 @@ isr_stub_8: ; Programmable Interval Timer
 	sti
 	iret
 
+isr_stub_9: ; keyboard input / IRQ1
 
 	%define	PS_2_data	0x60
 	%define	PS_2_cmd	0x64
 
-	%define Scancode_set		0x9f100
-	%define ASCII_layout		0x9f200
+	%define Scancode_set		0x90100
+	%define ASCII_layout		0x90200
 
-	%define Keycode_buffer		0x9f400
-	%define Keycode_register	0x9f002
-	%define Keycode_status		0x9f000
+	%define Keycode_buffer		0x90400
+	%define Keycode_register	0x90002
+	%define Keycode_status		0x90000
 
-	%define Keyboard_modifier_keys	0x9f001
-	%define ASCII_input_register	0x9f003
-	%define ASCII_buffer		0x9f500
+	%define Keyboard_modifier_keys	0x90001
+	%define ASCII_input_register	0x90003
+	%define ASCII_buffer		0x90500
 
-isr_stub_9: ; keyboard input
 	pushad
 
 	xor	eax, eax
@@ -111,7 +111,9 @@ isr_stub_9: ; keyboard input
 	cmp	al, 0x38	; alt
 	je	irq1_modifierkey_alt_p
 
-	cmp	al, 0x2a	; shift
+	cmp	al, 0x2a	; l shift
+	je	irq1_modifierkey_shift_p
+	cmp	al, 0x36	; r shift
 	je	irq1_modifierkey_shift_p
 
 	; released
@@ -121,8 +123,11 @@ isr_stub_9: ; keyboard input
 	cmp	al, 0xb8	; alt
 	je	irq1_modifierkey_alt_r
 
-	cmp	al, 0xaa	; shift
+	cmp	al, 0xaa	; l shift
 	je	irq1_modifierkey_shift_r
+	cmp	al, 0xb6	; r shift
+	je	irq1_modifierkey_shift_r
+
 irq1_modifierkeys_ret1:
 
 	; ignore if it is key release

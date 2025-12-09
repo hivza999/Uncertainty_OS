@@ -3,11 +3,9 @@
 
 	section .text
 
-	%define Keycode_status		0x9f000
-	%define	Keycode_register	0x9f002
-	%define ASCII_input_register	0x9f003
+	%define data_Registers		0x90000
 
-	%define	Scancode_set		0x9f100
+	%define	Scancode_set		0x90100
 
 _start:
 	; Initialization
@@ -27,10 +25,13 @@ scancodeset1_initialization_loop:
 	jb	scancodeset1_initialization_loop
 
 	; Initialize keycode registers
-
-	mov	dword [Keycode_status], 0x00
-	mov	byte [Keycode_register], 0x00
-	mov	byte [ASCII_input_register], 0x00
+	mov	edi, data_Registers
+inti_loop_reg:
+	mov	dword [edi], 0
+	add	edi, 4
+	
+	cmp	edi, data_Registers + 0x100
+	jb	inti_loop_reg
 
 	; init idt
 	extern idt_init
