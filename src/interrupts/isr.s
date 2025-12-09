@@ -164,8 +164,6 @@ irq1_modifierkeys_ret2:
 	test	ch, 0x3
 	jnz	irq1_exit
 
-	
-
 
 	mov	al, cl
 	; b4: capslock modifier / b5: numlock
@@ -173,7 +171,6 @@ irq1_modifierkeys_ret2:
 
 	mov	ah, ch
 
-	or	al, al
 	js	irq1_modifierkey_jmp0
 
 	shr	ah, 4
