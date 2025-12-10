@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "interrupts/idt.h"
+#include "cpu/interrupts/idt.h"
 #include <stdbool.h>
 
 #define memory_map 0x8000

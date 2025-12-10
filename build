@@ -7,16 +7,16 @@ rm -rf bin
 mkdir bin
 mkdir bin/tmp
 
-nasm src/boot.s -f bin -o bin/tmp/boot.img
+nasm src/cpu/boot.s -f bin -o bin/tmp/boot.img
 
 nasm "src/kernel_entry.s" -f elf -o "bin/tmp/kernel_entry.o"
 i686-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
 
 # Iterrupts
 mkdir bin/tmp/interrupts
-i686-elf-gcc -ffreestanding -m32 -g -c 'src/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
+i686-elf-gcc -ffreestanding -m32 -g -c 'src/cpu/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
 
-nasm "src/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
+nasm "src/cpu/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
 
 # link
 i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x0500 \
