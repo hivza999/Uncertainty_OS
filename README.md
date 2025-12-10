@@ -29,7 +29,7 @@ Data will mostlikely be erased
 
 ```bash
 sudo dd if=bin/os.img of=/dev/sdX
-# SDX is the device to write to
+# sdX is the device to write to
 ```
 
 ## Building the project
