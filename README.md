@@ -1,16 +1,64 @@
 # Welcome to Uncertainty OS
 
+A 32 bit Unix-like OS
+
 This is what i do with my insanity
 
----
+## Requirements
 
-Directories:
+### To compile
 
-src/\
-contain source file of the OS
+- Nasm
+- [i686 cross-compiler](https://wiki.osdev.org/GCC_Cross-Compiler)
 
-bin/\
-contain build of the OS
+### To run
 
-build\
-run this to build the os
+#### To Emulate
+
+- Qemu
+
+#### TO run on real hardware
+
+- x86
+- bios
+
+To make a bootable usb / disk
+
+```bash
+sudo dd if=bin/os.img of=/dev/sdX
+# SDX is the device to write to
+```
+
+**Warning**\
+Data will mostlikely be erased
+
+## Building the project
+
+To build the os:
+
+```bash
+./build
+```
+
+A disk image will be made at `bin/os.img`\
+Qemu will atomaticly be launched
+
+## Project tree
+
+```
+Uncertainty_OS/
+├─ bin/                 Compiled stuff
+│  ├─ tmp/              Tempory files
+│  └─ os.img            OS image
+├─ src/
+│  ├─ cpu/              CPU stuff
+│  │  ├─ interrupts/    Interrupt handeling
+│  │  └─ boot.s         bootloader
+│  ├─ kernel_entry.s    Where the kernel start execution
+│  └─ kernel.c          The main kernel file
+├─ .gitignore
+├─ build                Use ths to build this project
+├─ memory_map.md        Memory map of the OS
+├─ README.md
+└─ TODO.md
+```

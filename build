@@ -9,7 +9,7 @@ mkdir bin/tmp
 
 nasm src/boot.s -f bin -o bin/tmp/boot.img
 
-nasm "src/kernel_entry.asm" -f elf -o "bin/tmp/kernel_entry.o"
+nasm "src/kernel_entry.s" -f elf -o "bin/tmp/kernel_entry.o"
 i686-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
 
 # Iterrupts
