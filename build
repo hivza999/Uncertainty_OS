@@ -36,4 +36,6 @@ i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x0500 \
 
 cat bin/tmp/boot.img bin/tmp/kernel.bin > bin/os.img
 
+rm -rf bin/tmp
+
 qemu-system-x86_64  -drive file=bin/os.img,format=raw
