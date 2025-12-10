@@ -17,7 +17,7 @@ This is what i do with my insanity
 
 - Qemu
 
-#### TO run on real hardware
+#### To run on real hardware
 
 - x86
 - bios
