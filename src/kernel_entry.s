@@ -10,6 +10,11 @@
 _start:
 	; Initialization
 
+	; remap PICs
+
+	extern	remap_pic
+	call	remap_pic
+
 	; keycode table and ASCII layout initialization
 	mov	esi, scancodeset1
 	mov	edi, Scancode_set
@@ -34,12 +39,12 @@ inti_loop_reg:
 	jb	inti_loop_reg
 
 	; init idt
-	extern idt_init
-	call idt_init
+	extern	idt_init
+	call	idt_init
 
 	; start main kernel
-	extern main
-	call main
+	extern	main
+	call	main
 	jmp $
 
 	section .data

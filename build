@@ -15,8 +15,8 @@ i686-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
 # Iterrupts
 mkdir bin/tmp/interrupts
 i686-elf-gcc -ffreestanding -m32 -g -c 'src/cpu/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
-
 nasm "src/cpu/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
+nasm "src/cpu/interrupts/pic.s" -f elf -o "bin/tmp/interrupts/pic.o"
 
 #drivers
 mkdir bin/tmp/drivers
@@ -29,7 +29,7 @@ i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/d
 i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x0500 \
 \
 'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
-'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' \
+'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
 'bin/tmp/drivers/display/text.o' \
 \
 --oformat binary

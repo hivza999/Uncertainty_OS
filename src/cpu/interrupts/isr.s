@@ -62,11 +62,203 @@ isr_stub_7:
 	sti
 	iret
 
-isr_stub_8: ; Programmable Interval Timer / IRQ0
+isr_stub_8:
 	pushad
 
 	mov	al, 8
-	;call	exception_handler
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_9:
+	pushad
+
+	mov	al, 8
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_10:
+	pushad
+	mov	al, 10
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_11:
+	pushad
+	mov	al, 11
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_12:
+	pushad
+	mov	al, 12
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_13:
+	pushad
+	mov	al, 13
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_14:
+	pushad
+	mov	al, 14
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_15:
+	pushad
+	mov	al, 15
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_16:
+	pushad
+	mov	al, 16
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_17:
+	pushad
+	mov	al, 17
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_18:
+	pushad
+	mov	al, 18
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_19:
+	pushad
+	mov	al, 19
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_20:
+	pushad
+	mov	al, 20
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_21:
+	pushad
+	mov	al, 21
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_22:
+	pushad
+	mov	al, 22
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_23:
+	pushad
+	mov	al, 23
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_24:
+	pushad
+	mov	al, 24
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_25:
+	pushad
+	mov	al, 25
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_26:
+	pushad
+	mov	al, 26
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_27:
+	pushad
+	mov	al, 27
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_28:
+	pushad
+	mov	al, 28
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_29:
+	pushad
+	mov	al, 29
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_30:
+	pushad
+	mov	al, 30
+	call	exception_handler
+	popad
+	sti
+	iret
+
+isr_stub_31:
+	pushad
+	mov	al, 31
+	call	exception_handler
+	popad
+	sti
+	iret
+
+
+isr_stub_irq0:	; Programmable Interval Timer
+	pushad
 
 	mov	al, 0x20
 	out	0x20, al
@@ -75,7 +267,7 @@ isr_stub_8: ; Programmable Interval Timer / IRQ0
 	sti
 	iret
 
-isr_stub_9: ; keyboard input / IRQ1
+isr_stub_irq1:	; Keyboard
 
 	%define	PS_2_data	0x60
 	%define	PS_2_cmd	0x64
@@ -284,179 +476,184 @@ irq1_modifierkey_numlock:
 	mov	[Keyboard_modifier_keys], bl
 	jmp	irq1_modifierkeys_ret2
 
-
-isr_stub_10:
+isr_stub_irq2:
 	pushad
-	mov	al, 10
+
+	mov	al, 0x32
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_11:
+isr_stub_irq3:
 	pushad
-	mov	al, 11
+
+	mov	al, 0x33
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_12:
+isr_stub_irq4:
 	pushad
-	mov	al, 12
+
+	mov	al, 0x34
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_13:
+isr_stub_irq5:
 	pushad
-	mov	al, 13
+
+	mov	al, 0x35
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_14:
+isr_stub_irq6:
 	pushad
-	mov	al, 14
+
+	mov	al, 0x36
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_15:
+isr_stub_irq7:
 	pushad
-	mov	al, 15
+
+	mov	al, 0x37
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_16:
+isr_stub_irq8:
 	pushad
-	mov	al, 16
+
+	mov	al, 0x38
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_17:
+isr_stub_irq9:
 	pushad
-	mov	al, 17
+
+	mov	al, 0x39
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_18:
+isr_stub_irq10:
 	pushad
-	mov	al, 18
+
+	mov	al, 0x3a
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_19:
+isr_stub_irq11:
 	pushad
-	mov	al, 19
+
+	mov	al, 0x3b
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_20:
+isr_stub_irq12:
 	pushad
-	mov	al, 20
+
+	mov	al, 0x3c
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_21:
+isr_stub_irq13:
 	pushad
-	mov	al, 21
+
+	mov	al, 0x3d
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_22:
+isr_stub_irq14:
 	pushad
-	mov	al, 22
+
+	mov	al, 0x3e
 	call	exception_handler
+
+	mov	al, 0x20
+	out	0x20, al
+
 	popad
 	sti
 	iret
 
-isr_stub_23:
+isr_stub_irq15:
 	pushad
-	mov	al, 23
-	call	exception_handler
-	popad
-	sti
-	iret
 
-isr_stub_24:
-	pushad
-	mov	al, 24
+	mov	al, 0x3f
 	call	exception_handler
-	popad
-	sti
-	iret
 
-isr_stub_25:
-	pushad
-	mov	al, 25
-	call	exception_handler
-	popad
-	sti
-	iret
+	mov	al, 0x20
+	out	0x20, al
 
-isr_stub_26:
-	pushad
-	mov	al, 26
-	call	exception_handler
-	popad
-	sti
-	iret
-
-isr_stub_27:
-	pushad
-	mov	al, 27
-	call	exception_handler
-	popad
-	sti
-	iret
-
-isr_stub_28:
-	pushad
-	mov	al, 28
-	call	exception_handler
-	popad
-	sti
-	iret
-
-isr_stub_29:
-	pushad
-	mov	al, 29
-	call	exception_handler
-	popad
-	sti
-	iret
-
-isr_stub_30:
-	pushad
-	mov	al, 30
-	call	exception_handler
-	popad
-	sti
-	iret
-
-isr_stub_31:
-	pushad
-	mov	al, 31
-	call	exception_handler
 	popad
 	sti
 	iret
@@ -469,7 +666,12 @@ isr_stub_table:
 	dd	isr_stub_%+i
 %assign i i+1 
 %endrep
-
+ 
+%assign i 0
+%rep	16
+	dd	isr_stub_irq%+i
+%assign i i+1 
+%endrep
 
 exception_handler:
 	cli
