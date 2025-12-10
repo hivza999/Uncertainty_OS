@@ -24,13 +24,13 @@ This is what i do with my insanity
 
 To make a bootable usb / disk
 
+**Warning**\
+Data will mostlikely be erased
+
 ```bash
 sudo dd if=bin/os.img of=/dev/sdX
 # SDX is the device to write to
 ```
-
-**Warning**\
-Data will mostlikely be erased
 
 ## Building the project
 
