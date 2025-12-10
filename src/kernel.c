@@ -33,16 +33,8 @@ extern void main()
 	print_d10(total_memory / 1024, 0x0f, &Cursor);
 	print(" KiB of free memory\n\n", 0x0f, &Cursor);
 
-	for (int i = 0; i < 256; i++)
-	{
-		echo(i, 0x0f, &Cursor);
-	}
-
 	while (true)
 	{
-		uint32_t tmp32 = VIDEO_MEMORY + 80;
-		hexprint8(*keyboard_modifier_keys, 0x0f, &tmp32);
-
 		while (*keycode_register != local_keycode_register)
 		{
 			echo(keycode_buffer[local_keycode_register], 0x0f, &Cursor);
