@@ -59,8 +59,18 @@ extern void main()
 		}
 	}
 	// print it
-	print_d10(total_memory / 1024, 0x0f, &Cursor);
-	print(" KiB of free memory\n\n", 0x0f, &Cursor);
+	if (total_memory < (uint32_t)(1024 * 10000))
+	{
+		print_d10(total_memory / 1024, 0x0f, &Cursor);
+		print(" KiB", 0x0f, &Cursor);
+	}
+	else
+	{
+		print_d10(total_memory / (1024 * 1024), 0x0f, &Cursor);
+		print(" MiB", 0x0f, &Cursor);
+	}
+
+	print(" of free memory\n\n", 0x0f, &Cursor);
 
 	uint8_t local_keycode_register = *keycode_register;
 	while (true)
