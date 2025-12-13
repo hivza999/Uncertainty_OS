@@ -182,7 +182,7 @@ part1:	db	0x80		; partition attributes (Bit 7 = bootable)
 	db	0x28		; Ending Cylinder
 	
 	dw	0x0800, 0x0000	; Relative sector (Words are inverted)
-	dw	0x07ff, 0x0020	; Total sectors
+	dw	0x0000, 0x0020	; Total sectors
 
 	; partition 1 is created
 	; 1GiB, FAT32
