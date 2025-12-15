@@ -2,6 +2,14 @@
 #include <stdint.h>
 
 #define sector_size 512
+#define sector_per_cluster 0x08
+#define Cluster_size sector_per_cluster *sector_size
+
+#define ATTR_READ_ONLY 0x01
+#define ATTR_HIDDEN 0x02
+#define ATTR_SYSTEM 0x04
+#define ATTR_VOLUME_LABEL 0x08
+#define ATTR_DIRECTORY 0x10
 
 typedef struct fat32_bios_parameter
 {
@@ -71,6 +79,9 @@ typedef struct DirEntry
 
 } __attribute__((packed)) DirEntry_t;
 
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size);
+DirEntry_t *mkdir(uint32_t *FAT, DirEntry_t *dir, char *name);
+
 int main()
 {
 
@@ -104,7 +115,7 @@ int main()
 		fat32_bios_parameter.identifier[i] = "UncertFS"[i];
 	}
 	fat32_bios_parameter.bytes_per_sector = sector_size;
-	fat32_bios_parameter.sectors_per_cluster = 0x08;
+	fat32_bios_parameter.sectors_per_cluster = sector_per_cluster;
 	fat32_bios_parameter.reserved_sector_count = 0x0020;
 	fat32_bios_parameter.nb_fat = 2;
 	fat32_bios_parameter.root_entry_count = 0;
@@ -163,14 +174,6 @@ int main()
 	FAT[0] = 0x0ffffff8;
 	FAT[1] = 0x0fffffff;
 
-#define Cluster_size fat32_bios_parameter.sectors_per_cluster *sector_size
-
-#define READ_ONLY 0x01
-#define HIDDEN 0x02
-#define SYSTEM 0x04
-#define VOLUME_LABEL 0x08
-#define DIRECTORY 0x10
-
 	uint8_t Clusters[16][Cluster_size];
 	for (uint32_t i = 0; i < sizeof(Clusters); i++)
 	{
@@ -181,49 +184,20 @@ int main()
 	root = (DirEntry_t *)&Clusters[0];
 	FAT[2] = 0x0fffffff;
 
-	for (uint8_t i = 0; i < 11; i++)
-	{
-		root[0].Name[i] = "UNCERTAINTY"[i];
-	}
-	root[0].Attribute0 = VOLUME_LABEL;
-
-	for (uint8_t i = 0; i < 11; i++)
-	{
-		root[1].Name[i] = "FOLDER     "[i];
-	}
-	root[1].Attribute0 = DIRECTORY;
-	root[1].cluster_nb_low = 3;
+	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0);
+	add_entry(root, "FOLDER     ", ATTR_DIRECTORY, 3, 0);
 
 	DirEntry_t *folder;
 	folder = (DirEntry_t *)&Clusters[1];
 	FAT[3] = 0x0fffffff;
-
-	for (uint8_t i = 0; i < 11; i++)
-	{
-		folder[0].Name[i] = ".          "[i];
-	}
-	folder[0].Attribute0 = DIRECTORY;
-	folder[0].cluster_nb_low = 3;
-
-	for (uint8_t i = 0; i < 11; i++)
-	{
-		folder[1].Name[i] = "..         "[i];
-	}
-	folder[1].Attribute0 = DIRECTORY;
-
-	for (uint8_t i = 0; i < 8; i++)
-	{
-		folder[2].Name[i] = "FILENAME"[i];
-	}
-	for (uint8_t i = 0; i < 3; i++)
-	{
-		folder[2].Extention[i] = "TXT"[i];
-	}
-	folder[2].cluster_nb_low = 4;
-	folder[2].size = Cluster_size + 13;
-
 	FAT[4] = 5;
 	FAT[5] = 0x0fffffff;
+
+	add_entry(folder, ".          ", ATTR_DIRECTORY, 3, 0);
+	add_entry(folder, "..         ", ATTR_DIRECTORY, 0, 0);
+	add_entry(folder, "FILE    TXT", 0, 4, Cluster_size + 13);
+	add_entry(folder, "LOOP       ", ATTR_DIRECTORY, 3, 0);
+
 	for (uint32_t i = 0; i < Cluster_size; i++)
 	{
 		Clusters[2][i] = "Writing Data!\n"[i % 14];
@@ -240,5 +214,33 @@ int main()
 	fwrite(Clusters, Cluster_size * 16, 1, fptr);
 
 	printf("Image builded successfully\n");
+	return (0);
+}
+
+DirEntry_t *mkdir(uint32_t *FAT, DirEntry_t *dir, char *name)
+{
+}
+
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size)
+{
+	int id = 0;
+	while (dir[id].Name[0] != 0x00)
+	{
+		id++;
+		if (id >= (Cluster_size / sizeof(DirEntry_t)))
+		{
+			printf("Directory is full!\n");
+			return (-1);
+		};
+	};
+
+	for (uint8_t i = 0; i < 11; i++)
+	{
+		dir[id].Name[i] = name[i];
+	}
+	dir[id].Attribute0 = atttributes;
+	dir[id].cluster_nb_low = cluster_nb;
+	dir[id].size = size;
+
 	return (0);
 }
