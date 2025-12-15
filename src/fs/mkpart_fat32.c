@@ -3,7 +3,9 @@
 
 #define sector_size 512
 #define sector_per_cluster 0x08
+
 #define Cluster_size sector_per_cluster *sector_size
+#define fat_nb_sector 0x0800
 
 #define ATTR_READ_ONLY 0x01
 #define ATTR_HIDDEN 0x02
@@ -80,7 +82,10 @@ typedef struct DirEntry
 } __attribute__((packed)) DirEntry_t;
 
 int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size);
-DirEntry_t *mkdir(uint32_t *FAT, DirEntry_t *dir, char *name);
+DirEntry_t *mkdir(DirEntry_t *dir, char *name);
+
+uint32_t FAT[fat_nb_sector * sector_size / sizeof(uint32_t)];
+uint8_t Clusters[16][Cluster_size];
 
 int main()
 {
@@ -125,7 +130,7 @@ int main()
 	fat32_bios_parameter.hidden_sector_count = 0x00000800;
 	fat32_bios_parameter.sector_count = 0x001ffffe;
 
-	fat32_bios_parameter.fat_sector_count = 0x0800;
+	fat32_bios_parameter.fat_sector_count = fat_nb_sector;
 	fat32_bios_parameter.flags = 0x0000;
 	fat32_bios_parameter.fat_version = 0x0000;
 	fat32_bios_parameter.nb_root_cluster = 2;
@@ -165,8 +170,7 @@ int main()
 	}
 
 	// fat
-	uint32_t FAT[fat32_bios_parameter.fat_sector_count * sector_size / sizeof(uint32_t)];
-	for (uint32_t i = 0; i < fat32_bios_parameter.fat_sector_count * sector_size / sizeof(uint32_t); i++)
+	for (uint32_t i = 0; i < fat_nb_sector * sector_size / sizeof(uint32_t); i++)
 	{
 		FAT[i] = 0;
 	}
@@ -174,7 +178,7 @@ int main()
 	FAT[0] = 0x0ffffff8;
 	FAT[1] = 0x0fffffff;
 
-	uint8_t Clusters[16][Cluster_size];
+	// clear cluster
 	for (uint32_t i = 0; i < sizeof(Clusters); i++)
 	{
 		((uint8_t *)Clusters)[i] = 0;
@@ -185,16 +189,13 @@ int main()
 	FAT[2] = 0x0fffffff;
 
 	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0);
-	add_entry(root, "FOLDER     ", ATTR_DIRECTORY, 3, 0);
 
 	DirEntry_t *folder;
-	folder = (DirEntry_t *)&Clusters[1];
-	FAT[3] = 0x0fffffff;
+	folder = mkdir(root, "FOLDER     ");
+
 	FAT[4] = 5;
 	FAT[5] = 0x0fffffff;
 
-	add_entry(folder, ".          ", ATTR_DIRECTORY, 3, 0);
-	add_entry(folder, "..         ", ATTR_DIRECTORY, 0, 0);
 	add_entry(folder, "FILE    TXT", 0, 4, Cluster_size + 13);
 	add_entry(folder, "LOOP       ", ATTR_DIRECTORY, 3, 0);
 
@@ -217,8 +218,38 @@ int main()
 	return (0);
 }
 
-DirEntry_t *mkdir(uint32_t *FAT, DirEntry_t *dir, char *name)
+DirEntry_t *mkdir(DirEntry_t *dir, char *name)
 {
+	int id = 2;
+	uint32_t parent_cluster_nb;
+	while (FAT[id] != 0)
+	{
+		id++;
+	}
+	FAT[id] = 0x0fffffff;
+	add_entry(dir, name, ATTR_DIRECTORY, id, 0);
+
+	if (dir[0].Name == ".       ")
+	{
+		parent_cluster_nb = dir[0].cluster_nb_high << 16 + dir[0].cluster_nb_low;
+	}
+	else
+	{
+		if (dir[0].Attribute0 == ATTR_VOLUME_LABEL)
+		{
+			parent_cluster_nb = 0;
+		}
+		else
+		{
+			printf("Error,\nInvalid parent directory\n");
+		}
+	}
+
+	DirEntry_t *new_dir;
+	new_dir = (DirEntry_t *)&Clusters[id - 2];
+	add_entry(new_dir, ".          ", ATTR_DIRECTORY, id, 0);
+	add_entry(new_dir, "..         ", ATTR_DIRECTORY, parent_cluster_nb, 0);
+	return (new_dir);
 }
 
 int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size)
@@ -239,6 +270,7 @@ int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster
 		dir[id].Name[i] = name[i];
 	}
 	dir[id].Attribute0 = atttributes;
+	dir[id].cluster_nb_high = cluster_nb >> 16;
 	dir[id].cluster_nb_low = cluster_nb;
 	dir[id].size = size;
 
