@@ -6,16 +6,26 @@
 	bits 16		; targeting 16 bit
 
 ; start
+	xor	ax, ax
+	mov	ds, ax
 
-	; load kernel
-	mov	ah, 0x02
-	mov	al, 32			; sector count to read
-	mov	ch, 0			; cylinder
-	mov	cl, 2			; sector
-	mov	dh, 0			; head
-	mov	bx, kernel_location	; buffer
-					; drive select (already in dl)
-	int	0x13			; interupt read disk (ah = 0x02)
+	; enable enhanced disk drive services
+	mov	si, edd_Error_text	; in case of error
+	mov	ah, 0x41
+	mov	bx, 0x55aa
+	int	0x13
+
+	cmp	bx, 0xaa55
+	jne	Error	; error if bx isnt 0xaa55
+
+	; cx > supported commands
+	test	cl, 0x01	; check if  extended read/write services are available
+	jz	Error
+
+	mov	si, disk_adress_packet
+	mov	ah, 0x42
+	mov	dl, 0x80
+	int	0x13
 
 	; switch video mode
 	mov	ax, 0x0003	; ah = 0, al = video mode
@@ -27,6 +37,7 @@
 	int	0x10
 
 	; get memory map
+	mov	si, mmap_Error_text	; in case of errores
 	mov	di, (memory_map_location+4)
 
 	clc
@@ -40,43 +51,43 @@
 	mov	dword [es:di + 20], 1
 
 	int	0x15
-	jc	short mmap_Error		; if unsuported function
+	jc	short Error		; if unsuported function
 	mov	edx, 0x0534D4150
 	cmp	eax, edx		; if success: eax = 0x0534D4150
-	jne	short mmap_Error
+	jne	short Error
 	test	ebx, ebx		; ebx = 0 > list is 1 entry long, skip it
-	je	short mmap_Error
+	je	short Error
 
-	jmp	mmap_jmp
+	jmp	short mmap_jmp
 
 mmap_loop:
-	mov eax, 0xe820
-	mov [es:di + 20], dword 1
-	mov ecx, 24
-	int 0x15
-	jc short mmap_finished	; carry flag > end of list
-	mov edx, 0x0534D4150
+	mov	eax, 0xe820
+	mov	[es:di + 20], dword 1
+	mov	ecx, 24
+	int	0x15
+	jc	short mmap_finished	; carry flag > end of list
+	mov	edx, 0x0534D4150
 
 mmap_jmp:
 	jcxz	mmap_skip_entry
 	cmp	al, 20			; 24 bytes > ACPI 3.X response
-	jbe	mmap_not_extended
+	jbe	short mmap_not_extended
 
 	; ACPI 3
 	test	byte [es:di + 20], 1	; see if segment is present or not
 	je	short mmap_skip_entry
 
 mmap_not_extended:
-	mov ecx, [es:di + 8]	; get lower uint32_t of memory region length
-	or ecx, [es:di + 12]	; "or" it with upper uint32_t to test for zero
-	jz mmap_skip_entry		; if length uint64_t is 0, skip entry
+	mov	ecx, [es:di + 8]	; get lower uint32_t of memory region length
+	or	ecx, [es:di + 12]	; "or" it with upper uint32_t to test for zero
+	jz	short mmap_skip_entry		; if length uint64_t is 0, skip entry
 
 	add	di, 24		; if entry is valid, incread di to next entry position
 	inc	bp		; increase counter
 
 mmap_skip_entry:
 	and	ebx, ebx	; if ebx = 0, list is complete
-	jnz	mmap_loop
+	jnz	short mmap_loop
 
 mmap_finished:
 	mov	[es:memory_map_location], bp
@@ -97,20 +108,35 @@ mmap_finished:
 	; jump to 32 bit code (clear pipeline)
 	jmp CODE_SEG:start32
 
-mmap_Error:
-	mov	si, mmap_Error_text
+Error:
 	mov	ah, 0x0e	; displlay character
 
-mmap_Error_loop:
+Error_loop:
 	mov	al, [si]
 	inc	si
 	int	0x10
 	cmp	al, 0
-	jne	mmap_Error_loop
+	jne	short Error_loop
 
-	jmp	$
+	jmp	short $
+
+debug:
 
 	; data for 16 bit part of the bootloader
+
+	; Disk Address Packet Structure
+align 4
+disk_adress_packet:
+	db	16	; size of packet
+	db	0	; always 0
+	dw	32	; nb of sectors to read
+	; buffer to read to
+	dw	kernel_location	; offset
+	dw	0		; segment
+
+	dd	6192	; LBA (b0-b32)		(hard coded adress of the kernel in the filesystem)
+	dd	0	; LBA adress (b33-b48)
+
 	; Global Descriptor Table
 gdt_descriptor:
 	dw	gdt_start - gdt_end - 1	; size
@@ -140,6 +166,9 @@ gdt_end:
 
 mmap_Error_text:
 	db	'Error detecting memory', 0
+
+edd_Error_text:
+	db	'Error while activating BIOS Enhanced Disk Drive Services', 0
 
 	; get offset for segments
 CODE_SEG equ gdt_code - gdt_start
@@ -199,3 +228,5 @@ times 16 db 0
 
 	; bootable signature
 dw	0xaa55
+
+times (2048*512)-($-$$) db 0

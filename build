@@ -1,41 +1,181 @@
 #!/bin/bash
 set -e
 
-export PATH="$HOME/opt/cross/bin:$PATH"
+build_tools () {
+	echo building tools
+	if [[ -d tools ]]; then
+		rm tools -r
+	fi
 
-rm -rf bin
-mkdir bin
-mkdir bin/tmp
+	mkdir tools
 
-nasm src/cpu/boot.s -f bin -o bin/tmp/boot.img
+	gcc tools_src/mkpart_fat32.c -o tools/mkpart_fat32
+}
 
-nasm "src/kernel_entry.s" -f elf -o "bin/tmp/kernel_entry.o"
-i686-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
+build_bootloader () {
+	echo Building bootloader
 
-# Iterrupts
-mkdir bin/tmp/interrupts
-i686-elf-gcc -ffreestanding -m32 -g -c 'src/cpu/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
-nasm "src/cpu/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
-nasm "src/cpu/interrupts/pic.s" -f elf -o "bin/tmp/interrupts/pic.o"
+	if [[ ! -d bin ]]; then
+		mkdir bin
+	fi
+	
+	if [[ ! -d bin/part ]]; then
+		mkdir bin/part
+	fi
 
-#drivers
-mkdir bin/tmp/drivers
+	if [[ -d bin/tmp ]]; then
+		rm -r bin/tmp
+	fi
 
-#display
-mkdir bin/tmp/drivers/display
-i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/drivers/display/text.o
+	mkdir bin/tmp
 
-# link
-i686-elf-ld -o bin/tmp/kernel.bin -Ttext 0x0500 \
-\
-'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
-'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
-'bin/tmp/drivers/display/text.o' \
-\
---oformat binary
+	nasm src/cpu/boot.s -f bin -o bin/part/bootloader
 
-cat bin/tmp/boot.img bin/tmp/kernel.bin > bin/os.img
+	rm -r bin/tmp
+}
 
-rm -rf bin/tmp
+build_kernel () {
+	echo Building kernel
+	export PATH="$HOME/opt/cross/bin:$PATH"
 
-qemu-system-x86_64  -drive file=bin/os.img,format=raw
+	if [[ ! -d bin ]]; then
+		mkdir bin
+	fi
+	
+	if [[ ! -d bin/fs ]]; then
+		mkdir bin/fs
+	fi
+
+	if [[ ! -d bin/fs/boot ]]; then
+		mkdir bin/fs/boot
+	fi
+
+	if [[ -d bin/tmp ]]; then
+		rm -r bin/tmp
+	fi
+
+	mkdir bin/tmp
+
+	nasm "src/kernel_entry.s" -f elf -o "bin/tmp/kernel_entry.o"
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/kernel.c' -o bin/tmp/kernel.o
+
+	# Iterrupts
+	mkdir bin/tmp/interrupts
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/cpu/interrupts/idt.c' -o bin/tmp/interrupts/idt.o
+	nasm "src/cpu/interrupts/isr.s" -f elf -o "bin/tmp/interrupts/isr.o"
+	nasm "src/cpu/interrupts/pic.s" -f elf -o "bin/tmp/interrupts/pic.o"
+
+	#drivers
+	mkdir bin/tmp/drivers
+
+	#display
+	mkdir bin/tmp/drivers/display
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/drivers/display/text.o
+
+	# link
+	i686-elf-ld -o bin/fs/boot/kernel -Ttext 0x0500 \
+	\
+	'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
+	'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
+	'bin/tmp/drivers/display/text.o' \
+	\
+	--oformat binary
+
+	rm -r bin/tmp
+}
+
+build_filesystem () {
+	echo building filesystem
+
+	if [[ ! -d bin ]]; then
+		mkdir bin
+	fi
+	
+	if [[ ! -d bin/part ]]; then
+		mkdir bin/part
+	fi
+
+	if [[ -e tools/mkpart_fat32 ]]; then
+		tools/mkpart_fat32
+	
+	else
+		echo Error, tools weren\'t compiled
+		exit
+	fi
+}
+
+assemble () {
+	echo Assembling
+
+	not_assembled=()
+
+	if [[ ! -e bin/part/bootloader ]]; then
+		not_assembled+=('Bootloader')
+	fi
+		
+	if [[ ! -e bin/part/partition ]]; then
+		not_assembled+=('Partition')
+	fi
+
+	for i in ${not_assembled[@]}; do
+		echo $i not assembled
+	done
+
+	if [[ ${#not_assembled[@]} -gt 0 ]]; then
+		echo Not assembling
+	
+	else
+		cat bin/part/bootloader bin/part/partition > bin/Uncertainty.img
+	
+	fi
+
+}
+
+show_help () {
+	echo 1st argument:
+	echo t \> build tools
+	echo b \> build bootloader
+	echo k \> build kernel
+	echo a \> build all
+	echo h \> show help
+	echo
+	echo 2nd argument:
+	echo q \> launch qemu
+}
+
+if [[ $1 = "t" ]]; then
+build_tools
+
+elif [[ $1 = "b" ]]; then
+build_bootloader
+assemble
+
+elif [[ $1 = "k" ]]; then
+build_kernel
+
+elif [[ $1 = "f" ]]; then
+build_filesystem
+assemble
+
+elif [[ $1 = "a" ]]; then # all
+build_tools
+build_bootloader
+build_kernel
+build_filesystem
+assemble
+
+elif [[ $1 = 'h' ]]; then
+show_help
+
+elif [[ $1 = '' ]]; then
+show_help
+
+else
+echo Unkown function
+echo Type h or nothing to see help
+
+fi
+
+if [[ $2 = 'q' ]]; then
+	qemu-system-x86_64 -drive file=bin/Uncertainty.img,format=raw
+fi

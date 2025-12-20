@@ -1,4 +1,0 @@
-set -e
-
-gcc mkpart_fat32.c -o mkpart_fat32
-./mkpart_fat32
