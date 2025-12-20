@@ -142,11 +142,11 @@ int main()
 	fat32_bios_parameter.nb_drive = 0x80;
 	fat32_bios_parameter.signature0 = 0x29;
 	fat32_bios_parameter.volume_ID = 0x0000abcd;
-	for (uint8_t i; i < 11; i++)
+	for (uint8_t i = 0; i < 11; i++)
 	{
 		fat32_bios_parameter.volumme_name[i] = "UNCERTAINTY"[i];
 	}
-	for (uint8_t i; i < 8; i++)
+	for (uint8_t i = 0; i < 8; i++)
 	{
 		fat32_bios_parameter.system_iditenfier[i] = "FAT32   "[i];
 	}
