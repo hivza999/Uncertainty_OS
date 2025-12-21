@@ -40,10 +40,10 @@ To build all of the OS + tools:
 ./build a
 ```
 
-`build t` to build tools\
-`build b` to build bootloader\
-`build k` to build kernel\
-`build h` to show help
+`./build t` to build tools\
+`./build b` to build bootloader\
+`./build k` to build kernel\
+`./build h` to show help
 
 Add `q` as q 2nd argument to launch qemu
 
