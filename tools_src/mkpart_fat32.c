@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <string.h>
 
 #define sector_size 512
 #define sector_per_cluster 0x08
@@ -8,6 +10,7 @@
 #define Cluster_size sector_per_cluster *sector_size
 #define Cluster_shift 12
 #define fat_nb_sector 0x0800
+#define Cluster_count 4096
 
 #define ATTR_READ_ONLY 0x01
 #define ATTR_HIDDEN 0x02
@@ -85,11 +88,11 @@ typedef struct DirEntry
 
 int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size);
 void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster);
-uint32_t get_cluster_id(char *path);
-int format_name(char *name, char formated_name[13]);
+int format_name(char *name, char formated_name[11]);
+int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster);
 
 uint32_t FAT[fat_nb_sector * sector_size / sizeof(uint32_t)];
-uint8_t Clusters[18][Cluster_size];
+uint8_t Clusters[Cluster_count + 2][Cluster_size];
 
 int main()
 {
@@ -118,7 +121,7 @@ int main()
 	fat32_bios_parameter.bootjmp[0] = 0xeb;
 	fat32_bios_parameter.bootjmp[1] = 0xfe;
 	fat32_bios_parameter.bootjmp[2] = 0x90;
-	for (uint8_t i; i < 8; i++)
+	for (uint32_t i; i < 8; i++)
 	{
 		fat32_bios_parameter.identifier[i] = "UncertFS"[i];
 	}
@@ -142,11 +145,11 @@ int main()
 	fat32_bios_parameter.nb_drive = 0x80;
 	fat32_bios_parameter.signature0 = 0x29;
 	fat32_bios_parameter.volume_ID = 0x0000abcd;
-	for (uint8_t i = 0; i < 11; i++)
+	for (uint32_t i = 0; i < 11; i++)
 	{
 		fat32_bios_parameter.volumme_name[i] = "UNCERTAINTY"[i];
 	}
-	for (uint8_t i = 0; i < 8; i++)
+	for (uint32_t i = 0; i < 8; i++)
 	{
 		fat32_bios_parameter.system_iditenfier[i] = "FAT32   "[i];
 	}
@@ -161,13 +164,13 @@ int main()
 	// write it
 	fwrite(&fat32_bios_parameter, 512, 1, fptr); // 0
 	fwrite(&fat32_FSinfo, 512, 1, fptr);				 // 1
-	for (uint8_t i = 2; i < 6; i++)
+	for (uint32_t i = 2; i < 6; i++)
 	{
 		fwrite(empty_sector, 512, 1, fptr); // 2-5
 	}
 	fwrite(&fat32_bios_parameter, 512, 1, fptr); // 6
 	fwrite(&fat32_FSinfo, 512, 1, fptr);				 // 7
-	for (uint8_t i = 8; i < fat32_bios_parameter.reserved_sector_count; i++)
+	for (uint32_t i = 8; i < fat32_bios_parameter.reserved_sector_count; i++)
 	{
 		fwrite(empty_sector, 512, 1, fptr);
 	}
@@ -195,160 +198,156 @@ int main()
 	uint32_t next_free_cluster = 3;
 
 	{ // make filesystem
-		FILE *mkfs_ptr;
-		char line[128];
-		mkfs_ptr = fopen("tools_src/make_filesystem", "r");
-		if (!mkfs_ptr)
+
+		make_dir(root, "BOOT       ", &next_free_cluster); // add BOOT directory
+
+		// Add the kernel to it
+		FILE *file_source_ptr;
+		file_source_ptr = fopen("bin/part/kernel", "rb");
+		if (!file_source_ptr)
 		{
-			printf("! Couldnt open file \"> make_filesystem\"\n");
+			printf("! Error, file not found: %s\n", "bin/part/kernel");
 			return (1);
 		}
 
-		uint32_t line_nb = 1;
-		while (fgets(line, 100, mkfs_ptr))
+		// get size
+		struct stat st;
+		stat("bin/part/kernel", &st);
+		uint16_t cluster_nb = ((((int)st.st_size) - 1) >> Cluster_shift) + 1;
+		uint32_t cluster_id = next_free_cluster;
+
+		// add entry to parent folder
+		add_entry((DirEntry_t *)&(Clusters[3]), "KERNEL     ", ATTR_SYSTEM, next_free_cluster, st.st_size);
+		while (cluster_id + cluster_nb > next_free_cluster)
 		{
-			uint32_t i = 2;
-			switch (line[0])
-			{
-			case '\n':
-				// empty line
-				break;
-
-			case 'd':
-				while (line[i] != '\n')
-				{
-					i++;
-				};
-				while (i < 13)
-				{
-					line[i] = ' ';
-					i++;
-				}
-
-				make_dir(root, &(line[2]), &next_free_cluster);
-				break;
-
-			case 'f':
-				char path_source[64];
-				uint16_t path_source_lentgh = 0;
-				char path_destination[64];
-				uint16_t path_destination_lentgh = 0;
-				for (path_source_lentgh; path_source_lentgh < 7; path_source_lentgh++)
-				{
-					path_source[path_source_lentgh] = "bin/fs/"[path_source_lentgh];
-				}
-
-				i = 2;
-				while (line[i] != ' ')
-				{
-					if (line[i] == '\n')
-					{
-						printf("! Expected at least 2 arguments on line %i\n", line_nb);
-						return (1);
-					}
-					path_destination[path_destination_lentgh] = line[i];
-					path_destination_lentgh++;
-					i++;
-				}
-				path_destination[path_destination_lentgh] = 0;
-				i++;
-
-				while (line[i] != ' ' && line[i] != '\n')
-				{
-					path_source[path_source_lentgh] = line[i];
-					path_source_lentgh++;
-					i++;
-				}
-
-				// flags
-				uint8_t flags = 0;
-				if (line[i] == ' ')
-				{
-					i++;
-					while (line[i] != '\n')
-					{
-						switch (line[i])
-						{
-						case ' ':
-							break;
-
-						case 's':
-							flags |= ATTR_SYSTEM;
-							break;
-
-						default:
-							printf("! Unknowed argument line %i: \"%c\"\n", line_nb, line[i]);
-							return (1);
-						}
-						i++;
-					}
-				}
-
-				path_source[path_source_lentgh] = 0;
-
-				// get cluster id and file name
-				char formated_name[13];
-
-				int separator_index = path_destination_lentgh;
-				while (path_destination[separator_index] != '/')
-				{
-					separator_index--;
-					if (separator_index < 0)
-					{
-						printf("! Invalid location destination on line %i\n> %s\n", line_nb, path_destination);
-					}
-				}
-				path_destination[separator_index] = 0;
-				if (format_name(&(path_destination[separator_index + 1]), formated_name))
-				{
-					return (1);
-				}
-				FILE *file_source_ptr;
-				file_source_ptr = fopen(path_source, "rb");
-				if (!file_source_ptr)
-				{
-					printf("! Error, file not found: %s\n", path_source);
-					return (1);
-				}
-
-				// get size
-				struct stat st;
-				stat(path_source, &st);
-				uint16_t cluster_nb = ((((int)st.st_size) - 1) >> Cluster_shift) + 1;
-				uint32_t cluster_id = next_free_cluster;
-
-				// add entry to parent folder
-				add_entry((DirEntry_t *)&(Clusters[get_cluster_id(path_destination)]), formated_name, flags, next_free_cluster, st.st_size);
-				while (cluster_id + cluster_nb > next_free_cluster)
-				{
-					FAT[next_free_cluster] = next_free_cluster + 1;
-					next_free_cluster++;
-				}
-				FAT[next_free_cluster - 1] = 0x0fffffff;
-
-				fread(&(Clusters[cluster_id]), Cluster_size, cluster_nb, file_source_ptr);
-
-				fclose(file_source_ptr);
-
-				break;
-
-			default:
-				printf("! Error on line %i\n> Unknowed operation \"%c\"\n", line_nb, line[0]);
-				return (1);
-			}
-			line_nb++;
+			FAT[next_free_cluster] = next_free_cluster + 1;
+			next_free_cluster++;
 		}
+		FAT[next_free_cluster - 1] = 0x0fffffff;
 
-		fclose(mkfs_ptr);
+		fread(&(Clusters[cluster_id]), Cluster_size, cluster_nb, file_source_ptr);
+		fclose(file_source_ptr);
+
+		// copy other files
+		char path[256];
+		for (uint32_t i = 0; i < 8; i++)
+		{
+			path[i] = "bin/fs/"[i];
+		}
+		uint32_t clusters[64];
+		clusters[0] = 2;
+
+		if (copy_dir(path, &(clusters[0]), &next_free_cluster))
+		{
+			return (1);
+		}
 	}
 
 	// 2 copies are written
 	fwrite(FAT, sizeof(FAT), 1, fptr);
 	fwrite(FAT, sizeof(FAT), 1, fptr);
 
-	fwrite(&(Clusters[2]), Cluster_size * 16, 1, fptr);
+	fwrite(&(Clusters[2]), Cluster_size, Cluster_count, fptr);
 
 	printf("  Image builded successfully\n");
+	return (0);
+}
+
+int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
+{
+	DIR *d;
+	struct dirent *dir;
+	d = opendir(path);
+
+	if (d)
+	{
+		while ((dir = readdir(d)) != NULL)
+		{
+			if (dir->d_name[0] != '.')
+			{
+				if (dir->d_type == DT_DIR) // directory
+				{
+					*(cluster + sizeof(uint32_t)) = *next_free_cluster;
+
+					char formated_name[11];
+					format_name(dir->d_name, formated_name);
+					make_dir((DirEntry_t *)(&Clusters[*cluster]), formated_name, next_free_cluster);
+
+					uint32_t i = 0;
+					uint32_t len = strlen(path);
+					while (dir->d_name[i] != 0)
+					{
+						path[i + len] = dir->d_name[i];
+						i++;
+					}
+					path[i + len] = '/';
+					path[i + len + 1] = 0;
+
+					if (copy_dir(path, cluster + sizeof(uint32_t), next_free_cluster))
+					{
+						return (1);
+					}
+
+					path[len] = 0;
+				}
+
+				else if (dir->d_type == DT_REG) // file
+				{
+					uint32_t i = 0;
+					uint32_t len = strlen(path);
+					while (dir->d_name[i] != 0)
+					{
+						path[i + len] = dir->d_name[i];
+						i++;
+					}
+					path[i + len] = 0;
+
+					// get cluster id and file name
+					char formated_name[13];
+
+					if (format_name(dir->d_name, formated_name))
+					{
+						return (1);
+					}
+
+					FILE *file_source_ptr;
+					file_source_ptr = fopen(path, "rb");
+					if (!file_source_ptr)
+					{
+						printf("! Error, file not found: %s\n", path);
+						return (1);
+					}
+
+					// get size
+					struct stat st;
+					stat(path, &st);
+					uint32_t cluster_nb = ((((int)st.st_size) - 1) >> Cluster_shift) + 1;
+					uint32_t cluster_id = *next_free_cluster;
+
+					// add entry to parent folder
+					add_entry((DirEntry_t *)&(Clusters[*cluster]), formated_name, 0, *next_free_cluster, st.st_size);
+					while (cluster_id + cluster_nb > *next_free_cluster)
+					{
+						FAT[*next_free_cluster] = (*next_free_cluster) + 1;
+						(*next_free_cluster)++;
+					}
+					FAT[*next_free_cluster - 1] = 0x0fffffff;
+
+					fread(&(Clusters[cluster_id]), Cluster_size, cluster_nb, file_source_ptr);
+
+					fclose(file_source_ptr);
+
+					path[len] = 0;
+				}
+			}
+		}
+		closedir(d);
+	}
+	else
+	{
+		printf("! Couldnt open %s\n", path);
+		return (1);
+	}
 	return (0);
 }
 
@@ -359,7 +358,7 @@ void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster)
 	FAT[*next_free_cluster] = 0x0fffffff;
 	add_entry(dir, name, ATTR_DIRECTORY, *next_free_cluster, 0);
 
-	if (dir[0].Name == ".       ")
+	if (*((uint64_t *)&(dir[0].Name)) == 0x202020202020202e) // ASCII of ".       " in a uint64 form
 	{
 		parent_cluster_nb = dir[0].cluster_nb_high << 16 + dir[0].cluster_nb_low;
 	}
@@ -385,7 +384,7 @@ void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster)
 
 int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size)
 {
-	int id = 0;
+	uint32_t id = 0;
 	while (dir[id].Name[0] != 0x00)
 	{
 		id++;
@@ -395,7 +394,7 @@ int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster
 		};
 	};
 
-	for (uint8_t i = 0; i < 11; i++)
+	for (uint32_t i = 0; i < 11; i++)
 	{
 		dir[id].Name[i] = name[i];
 	}
@@ -405,16 +404,9 @@ int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster
 	dir[id].size = size;
 }
 
-uint32_t get_cluster_id(char *path)
+int format_name(char *name, char formated_name[11])
 {
-	printf("  Path: %s\n", path);
-	return (3);
-}
-
-int format_name(char *name, char formated_name[13])
-{
-	printf("  name: %s\n", name);
-	uint8_t i;
+	uint32_t i;
 	for (i = 0; name[i] != '.' && name[i] != 0 && i < 9; i++)
 	{
 		if (i == 8)
@@ -426,13 +418,17 @@ int format_name(char *name, char formated_name[13])
 		{
 			formated_name[i] = name[i];
 		}
+		else if (name[i] >= 0x61 && name[i] <= 0x7a)
+		{
+			formated_name[i] = name[i] - 0x20;
+		}
 		else
 		{
-			printf("! Invalid character in name\n> %s | char %i", name, i);
+			printf("! Invalid character in name\n> %s | char %i\n", name, i);
 			formated_name[i] = '_';
 		}
 	}
-	uint8_t j;
+	uint32_t j;
 	for (j = i; j < 8; j++)
 	{
 		formated_name[j] = ' ';
@@ -452,9 +448,13 @@ int format_name(char *name, char formated_name[13])
 			{
 				formated_name[j] = name[i];
 			}
+			else if (name[i] >= 0x61 && name[i] <= 0x7a)
+			{
+				formated_name[j] = name[i] - 0x20;
+			}
 			else
 			{
-				printf("! Invalid character in name\n> %s | char %i", name, i);
+				printf("! Invalid character in name\n> %s | char %i\n", name, i);
 				formated_name[j] = '_';
 			}
 			j++;

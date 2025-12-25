@@ -42,12 +42,8 @@ build_kernel () {
 		mkdir bin
 	fi
 	
-	if [[ ! -d bin/fs ]]; then
-		mkdir bin/fs
-	fi
-
-	if [[ ! -d bin/fs/boot ]]; then
-		mkdir bin/fs/boot
+	if [[ ! -d bin/part ]]; then
+		mkdir bin/part
 	fi
 
 	if [[ -d bin/tmp ]]; then
@@ -73,7 +69,7 @@ build_kernel () {
 	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/drivers/display/text.o
 
 	# link
-	i686-elf-ld -o bin/fs/boot/kernel -Ttext 0x0500 \
+	i686-elf-ld -o bin/part/kernel -Ttext 0x0500 \
 	\
 	'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
 	'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
@@ -93,6 +89,10 @@ build_filesystem () {
 	
 	if [[ ! -d bin/part ]]; then
 		mkdir bin/part
+	fi
+
+	if [[ ! -d bin/fs ]]; then
+		mkdir bin/fs
 	fi
 
 	if [[ -e tools/mkpart_fat32 ]]; then
