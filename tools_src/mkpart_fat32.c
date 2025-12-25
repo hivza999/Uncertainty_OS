@@ -86,8 +86,8 @@ typedef struct DirEntry
 
 } __attribute__((packed)) DirEntry_t;
 
-int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size);
-void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster);
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes0, uint8_t atttributes1, uint32_t cluster_nb, uint32_t size);
+void make_dir(DirEntry_t *dir, char *name, uint8_t flags, uint32_t *next_free_cluster);
 int format_name(char *name, char formated_name[11]);
 int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster);
 
@@ -194,12 +194,12 @@ int main()
 	root = (DirEntry_t *)&Clusters[2];
 	FAT[2] = 0x0fffffff;
 
-	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0);
+	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0, 0);
 	uint32_t next_free_cluster = 3;
 
 	{ // make filesystem
 
-		make_dir(root, "BOOT       ", &next_free_cluster); // add BOOT directory
+		make_dir(root, "BOOT       ", 0x18, &next_free_cluster); // add BOOT directory
 
 		// Add the kernel to it
 		FILE *file_source_ptr;
@@ -217,7 +217,7 @@ int main()
 		uint32_t cluster_id = next_free_cluster;
 
 		// add entry to parent folder
-		add_entry((DirEntry_t *)&(Clusters[3]), "KERNEL     ", ATTR_SYSTEM, next_free_cluster, st.st_size);
+		add_entry((DirEntry_t *)&(Clusters[3]), "KERNEL     ", ATTR_SYSTEM, 0x18, next_free_cluster, st.st_size);
 		while (cluster_id + cluster_nb > next_free_cluster)
 		{
 			FAT[next_free_cluster] = next_free_cluster + 1;
@@ -270,8 +270,8 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 					*(cluster + sizeof(uint32_t)) = *next_free_cluster;
 
 					char formated_name[11];
-					format_name(dir->d_name, formated_name);
-					make_dir((DirEntry_t *)(&Clusters[*cluster]), formated_name, next_free_cluster);
+					uint8_t flags = format_name(dir->d_name, formated_name);
+					make_dir((DirEntry_t *)(&Clusters[*cluster]), formated_name, flags, next_free_cluster);
 
 					uint32_t i = 0;
 					uint32_t len = strlen(path);
@@ -305,7 +305,8 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 					// get cluster id and file name
 					char formated_name[13];
 
-					if (format_name(dir->d_name, formated_name))
+					uint32_t flags = format_name(dir->d_name, formated_name);
+					if (flags == 1)
 					{
 						return (1);
 					}
@@ -325,7 +326,7 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 					uint32_t cluster_id = *next_free_cluster;
 
 					// add entry to parent folder
-					add_entry((DirEntry_t *)&(Clusters[*cluster]), formated_name, 0, *next_free_cluster, st.st_size);
+					add_entry((DirEntry_t *)&(Clusters[*cluster]), formated_name, 0, flags, *next_free_cluster, st.st_size);
 					while (cluster_id + cluster_nb > *next_free_cluster)
 					{
 						FAT[*next_free_cluster] = (*next_free_cluster) + 1;
@@ -351,12 +352,12 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 	return (0);
 }
 
-void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster)
+void make_dir(DirEntry_t *dir, char *name, uint8_t flags, uint32_t *next_free_cluster)
 {
 	uint32_t parent_cluster_nb;
 
 	FAT[*next_free_cluster] = 0x0fffffff;
-	add_entry(dir, name, ATTR_DIRECTORY, *next_free_cluster, 0);
+	add_entry(dir, name, ATTR_DIRECTORY, flags, *next_free_cluster, 0);
 
 	if (*((uint64_t *)&(dir[0].Name)) == 0x202020202020202e) // ASCII of ".       " in a uint64 form
 	{
@@ -376,13 +377,13 @@ void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster)
 
 	DirEntry_t *new_dir;
 	new_dir = (DirEntry_t *)&Clusters[*next_free_cluster];
-	add_entry(new_dir, ".          ", ATTR_DIRECTORY, *next_free_cluster, 0);
-	add_entry(new_dir, "..         ", ATTR_DIRECTORY, parent_cluster_nb, 0);
+	add_entry(new_dir, ".          ", ATTR_DIRECTORY, 0, *next_free_cluster, 0);
+	add_entry(new_dir, "..         ", ATTR_DIRECTORY, 0, parent_cluster_nb, 0);
 
 	(*next_free_cluster)++;
 }
 
-int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size)
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes0, uint8_t atttributes1, uint32_t cluster_nb, uint32_t size)
 {
 	uint32_t id = 0;
 	while (dir[id].Name[0] != 0x00)
@@ -398,7 +399,8 @@ int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster
 	{
 		dir[id].Name[i] = name[i];
 	}
-	dir[id].Attribute0 = atttributes;
+	dir[id].Attribute0 = atttributes0;
+	dir[id].Attribute1 = atttributes1;
 	dir[id].cluster_nb_high = cluster_nb >> 16;
 	dir[id].cluster_nb_low = cluster_nb;
 	dir[id].size = size;
@@ -406,7 +408,13 @@ int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster
 
 int format_name(char *name, char formated_name[11])
 {
+	uint8_t flags = 0x03;
+	// case flags
+	// bit 0 & 1 > undefined
+	// bit 3 & 4 > the one that will be used
+
 	uint32_t i;
+
 	for (i = 0; name[i] != '.' && name[i] != 0 && i < 9; i++)
 	{
 		if (i == 8)
@@ -414,12 +422,36 @@ int format_name(char *name, char formated_name[11])
 			printf("! Name too long\n> %s\n", name);
 			return (1);
 		}
-		else if ((name[i] >= 0x21 && name[i] <= 0x29 && name[i] != 0x22) || (name[i] == 0x2d) || (name[i] >= 0x30 && name[i] <= 0x39) || (name[i] >= 0x40 && name[i] <= 0x5a) || (name[i] >= 0x5e && name[i] <= 0x60) || (name[i] >= 0x7b && name[i] <= 0x7e && name[i] != 0x7c))
+		else if ((name[i] >= 0x21 && name[i] <= 0x29 && name[i] != 0x22) || (name[i] == 0x2d) || (name[i] >= 0x30 && name[i] <= 0x39) || (name[i] == 0x40) || (name[i] >= 0x5e && name[i] <= 0x60) || (name[i] >= 0x7b && name[i] <= 0x7e && name[i] != 0x7c))
 		{
+			formated_name[i] = name[i];
+		}
+		else if (name[i] >= 0x41 && name[i] <= 0x5a)
+		{
+			if (flags & 0x01)
+			{
+				flags = 0x02; // upper case name, undefined extention
+			}
+			else if (flags & 0x08)
+			{
+				printf("! Invalid name\n> %s\n> Combination of lower and upper case\n", name);
+				return (1);
+			}
+
 			formated_name[i] = name[i];
 		}
 		else if (name[i] >= 0x61 && name[i] <= 0x7a)
 		{
+			if (flags & 0x01)
+			{
+				flags = 0x0a; // lower case name, undefined extention
+			}
+			else if (!(flags & 0x08))
+			{
+				printf("! Invalid name\n> %s\n> Combination of lower and upper case\n", name);
+				return (1);
+			}
+
 			formated_name[i] = name[i] - 0x20;
 		}
 		else
@@ -428,6 +460,11 @@ int format_name(char *name, char formated_name[11])
 			formated_name[i] = '_';
 		}
 	}
+	if (flags & 0x01)
+	{
+		flags = 0x02; // if no letter > uppercase ame + undefined extention
+	}
+
 	uint32_t j;
 	for (j = i; j < 8; j++)
 	{
@@ -444,12 +481,37 @@ int format_name(char *name, char formated_name[11])
 				printf("! Extention too long\n> %s\n", name);
 				return (1);
 			}
-			else if ((name[i] >= 0x21 && name[i] <= 0x29 && name[i] != 0x22) || (name[i] == 0x2d) || (name[i] >= 0x30 && name[i] <= 0x39) || (name[i] >= 0x40 && name[i] <= 0x5a) || (name[i] >= 0x5e && name[i] <= 0x60) || (name[i] >= 0x7b && name[i] <= 0x7e && name[i] != 0x7c))
+			else if ((name[i] >= 0x21 && name[i] <= 0x29 && name[i] != 0x22) || (name[i] == 0x2d) || (name[i] >= 0x30 && name[i] <= 0x39) || (name[i] == 0x40) || (name[i] >= 0x5e && name[i] <= 0x60) || (name[i] >= 0x7b && name[i] <= 0x7e && name[i] != 0x7c))
 			{
+				formated_name[j] = name[i];
+			}
+			else if (name[i] >= 0x41 && name[i] <= 0x5a)
+			{
+				if (flags & 0x02)
+				{
+					flags = (flags & 0x08); // upper case extention
+					printf("Upper, %i\n", flags);
+				}
+				else if (flags & 0x10)
+				{
+					printf("! Invalid name\n> %s\n> Combination of lower and upper case\n", name);
+					return (1);
+				}
+
 				formated_name[j] = name[i];
 			}
 			else if (name[i] >= 0x61 && name[i] <= 0x7a)
 			{
+				if (flags & 0x02)
+				{
+					flags = (flags & 0x08) | 0x10; // lower case extention
+				}
+				else if (!(flags & 0x10))
+				{
+					printf("! Invalid name\n> %s\n> Combination of lower and upper case\n", name);
+					return (1);
+				}
+
 				formated_name[j] = name[i] - 0x20;
 			}
 			else
@@ -460,10 +522,16 @@ int format_name(char *name, char formated_name[11])
 			j++;
 		}
 	}
+	if (flags & 0x02)
+	{
+		flags &= 0x08;
+	}
 
 	for (j; j < 11; j++)
 	{
 		formated_name[j] = ' ';
 	}
-	return (0);
+	printf("Name: %s, Flags: %i\n", name, flags);
+
+	return (flags);
 }
