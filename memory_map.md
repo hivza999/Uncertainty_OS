@@ -11,3 +11,4 @@
 | 0x90200 | 0x903ff | 256   | Keycode keyboard layout (256-511 > MAJ) |
 | 0x90400 | 0x904ff | 256   | Keycode buffer                          |
 | 0x90500 | 0x905ff | 256   | ASCII input buffer                      |
+| 0x90600 | 0x907ff | 512   | Identiify command (from ATA driver)     |

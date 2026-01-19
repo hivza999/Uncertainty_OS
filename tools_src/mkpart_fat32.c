@@ -103,7 +103,7 @@ void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster);
 void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes0, uint32_t cluster_nb, uint32_t size);
 
 void add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t sequence_id);
-uint8_t lfn_checksum(char name[11]);
+uint8_t lfn_checksum(char name[13]);
 
 int format_name(char *name, char formated_name[11]);
 int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster);

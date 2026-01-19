@@ -65,15 +65,18 @@ build_kernel () {
 	mkdir bin/tmp/drivers
 
 	#display
-	mkdir bin/tmp/drivers/display
-	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/drivers/display/text.o
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/display/text.c' -o bin/tmp/drivers/display__text.o
+
+	#storage
+	nasm "src/drivers/storage/ata.s" -f elf -o "bin/tmp/drivers/storage__ata.o"
 
 	# link
 	i686-elf-ld -o bin/part/kernel -Ttext 0x0500 \
 	\
 	'bin/tmp/kernel_entry.o' 'bin/tmp/kernel.o' \
 	'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
-	'bin/tmp/drivers/display/text.o' \
+	'bin/tmp/drivers/display__text.o' \
+	'bin/tmp/drivers/storage__ata.o' \
 	\
 	--oformat binary
 
@@ -136,6 +139,8 @@ show_help () {
 	echo t \> build tools
 	echo b \> build bootloader
 	echo k \> build kernel
+	echo f \> build filesystem
+	echo kf \> build kernel and filesystem
 	echo a \> build all
 	echo h \> show help
 	echo
@@ -154,6 +159,11 @@ elif [[ $1 = "k" ]]; then
 build_kernel
 
 elif [[ $1 = "f" ]]; then
+build_filesystem
+assemble
+
+elif [[ $1 = "kf" ]]; then
+build_kernel
 build_filesystem
 assemble
 

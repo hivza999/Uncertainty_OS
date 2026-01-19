@@ -257,6 +257,7 @@ isr_stub_31:
 	iret
 
 
+
 isr_stub_irq0:	; Programmable Interval Timer
 	pushad
 
@@ -562,6 +563,7 @@ isr_stub_irq8:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -575,6 +577,7 @@ isr_stub_irq9:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -588,6 +591,7 @@ isr_stub_irq10:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -601,6 +605,7 @@ isr_stub_irq11:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -614,6 +619,7 @@ isr_stub_irq12:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -627,19 +633,21 @@ isr_stub_irq13:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
 	iret
 
-isr_stub_irq14:
+isr_stub_irq14: ; primary ATA bus
 	pushad
 
-	mov	al, 0x3e
-	call	exception_handler
+	;mov	al, 0x3e
+	;call	exception_handler
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
@@ -653,6 +661,7 @@ isr_stub_irq15:
 
 	mov	al, 0x20
 	out	0x20, al
+	out	0xa0, al
 
 	popad
 	sti
