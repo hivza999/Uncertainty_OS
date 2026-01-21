@@ -4,7 +4,7 @@
 #define Scren_Width 80
 #define Scren_Height 25
 
-void print_size_o(uint64_t value, uint8_t color);
+void print_size_B(uint64_t value, uint8_t color);
 void print_d10(uint32_t value, uint8_t color);
 void echo(char value, uint8_t color);
 void print(char *string, uint8_t color);

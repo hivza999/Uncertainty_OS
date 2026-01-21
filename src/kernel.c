@@ -37,26 +37,25 @@ extern void main()
 			}
 		}
 		// print it
-		print_size_o(total_memory, 0x0f);
+		print_size_B(total_memory, 0x0f);
 		print(" usable memory\n", 0x0f);
 	}
 	{ // ATA PIO driver
 		print("Initializing ATA PIO driver...\n", 0x0f);
-		if (ATA_init())
-		{
-			print("Failed to initialize ATA PIO driver\n", 0x0f);
-			while (1)
-				;
-		}
-		else
-		{
-			print("ATA PIO driver initilized\n", 0x0f);
-		};
+		uint8_t Detected_drives = ATA_init();
+		print("ATA PIO driver initilized\n", 0x0f);
 
-		uint32_t Disk_size = *(uint32_t *)(&Disk_ATA_INDETIFY[60]) * 512;
-		print("Disk size: ", 0x0f);
-		print_size_o(Disk_size, 0x0f);
-		echo('\n', 0x0f);
+		char tmp_str[14] = "Disk _ size: ";
+		for (uint8_t i = 0; i < 4; i++)
+		{
+			if (Detected_drives & (1 << i))
+			{
+				tmp_str[5] = i + '0';
+				print(tmp_str, 0x0f);
+				print_size_B(*(uint64_t *)&(Disk_ATA_INDETIFY[256 * i + 100]) * 512, 0x0f); // print size of the disk
+				echo('\n', 0x0f);
+			}
+		}
 	}
 
 	uint8_t local_keycode_register = *keycode_register;
