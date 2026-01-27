@@ -351,30 +351,31 @@ Identify_secondary_error:
 
 global ATA_PIO_read
 ATA_PIO_read:
-	;1
+	mov	esi, eax
+
+	; select drive (low 4 bits are high bits of the LBA)
 	mov	dx, primary_ATA_Drive_Select
-	mov	al, 0xe0
+	mov	al, [esi+3]
 	out	dx, al
 
-	;2
-	call	wait_40ns
+	call	wait_40ns	; wait after a drive select
 
-	;3	sector count
-	mov	dx, primary_ATA_sector_count
-	mov	al, 1
-	out	dx, al
-
-	;4~6	LBA
+	; bits 0~23 of the LBA
 	mov	dx, primary_ATA_LBA_lo
-	mov	al, 0
+	mov	al, [esi]
 	out	dx, al
 
 	mov	dx, primary_ATA_LBA_mid
-	mov	al, 0
+	mov	al, [esi+1]
 	out	dx, al
 
 	mov	dx, primary_ATA_LBA_hi
-	mov	al, 0
+	mov	al, [esi+2]
+	out	dx, al
+
+	;3	sector count
+	mov	dx, primary_ATA_sector_count
+	mov	al, [esi+8]
 	out	dx, al
 
 	;7	read command
@@ -384,7 +385,7 @@ ATA_PIO_read:
 
 
 	mov	bx, 256		; counter
-	mov	edi, 0x8fe00	; destination
+	mov	edi, [esi+4]	; destination
 
 ATA_PIO_read_loop:
 	mov	dx, primary_ATA_Status

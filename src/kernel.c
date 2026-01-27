@@ -2,6 +2,7 @@
 #include "cpu/interrupts/idt.h"
 #include <stdbool.h>
 #include "drivers/display/text.h"
+#include "drivers/storage/ata.h"
 
 #define memory_map 0x8000
 #define memory_map_entries memory_map + 4
@@ -12,9 +13,6 @@
 #define Device_PATA 4
 #define Device_SATA 5
 #define Device_Unknowed 255
-
-extern uint32_t ATA_init();
-extern int ATA_PIO_read();
 
 const uint8_t *keyboard_modifier_keys = (uint8_t *)0x90001;
 
@@ -104,13 +102,6 @@ extern void main()
 				break;
 			}
 		}
-	}
-
-	ATA_PIO_read();
-	echo(0x1b, 0x0f);
-	for (uint32_t i = 0; i < 512; i++)
-	{
-		hexprint8(*((uint8_t *)i + 0x8fe00), 0x0f);
 	}
 
 	uint8_t local_keycode_register = *keycode_register;
