@@ -11,6 +11,7 @@
 %define primary_ATA_Drive_Select	primary_ATA_IO_base + 6
 %define primary_ATA_Command		primary_ATA_IO_base + 7
 %define primary_ATA_Status		primary_ATA_IO_base + 7
+%define primary_ATA_alternate_status	primary_ATA_Ctl_base + 0
 
 %define secondary_ATA_Data		secondary_ATA_IO_base + 0
 %define secondary_ATA_sector_count	secondary_ATA_IO_base + 2
@@ -22,7 +23,17 @@
 %define secondary_ATA_Status		secondary_ATA_IO_base + 7
 
 %define	ATA_Master_drive	0xa0
-%define	ATA_Slave_drive	0xb0
+%define	ATA_Slave_drive		0xb0
+
+%define ATA_IDENTIFY		0xec
+%define	ATA_PIO_READ		0x20
+
+%define	Device_ATA	1
+%define	Device_PATAPI	2
+%define	Device_SATAPI	3
+%define	Device_PATA	4
+%define	Device_SATA	5
+%define Device_Unknowed	255
 
 %define Identify_memory_location	0x90600
 
@@ -34,6 +45,7 @@ extern hexprint8
 global ATA_init
 ATA_init:
 	sub	esp, 4
+	mov	dword [ebp-4], 0
 
 
 	; primary ATA / Master
@@ -41,21 +53,23 @@ ATA_init:
 	mov	al, ATA_Master_drive
 	mov	dx, primary_ATA_Drive_Select
 	out	dx, al
+	call	wait_40ns
 
 	mov	ebx, Identify_memory_location
 	call	Identify_primary_disk
-	mov	byte [ebp-4], al
+	or	dword [ebp-4], eax
 
 	; primary ATA / Slave
 	; Select drive
 	mov	al, ATA_Slave_drive
 	mov	dx, primary_ATA_Drive_Select
 	out	dx, al
+	call	wait_40ns
 
 	mov	ebx, Identify_memory_location + 512
 	call	Identify_primary_disk
-	shl	al, 1
-	or	byte [ebp-4], al
+	shl	eax, 8
+	or	dword [ebp-4], eax
 
 
 	; secondary ATA / Master
@@ -63,26 +77,40 @@ ATA_init:
 	mov	al, ATA_Master_drive
 	mov	dx, secondary_ATA_Drive_Select
 	out	dx, al
+	call	wait_40ns
 
 	mov	ebx, Identify_memory_location + 1024
 	call	Identify_secondary_disk
-	shl	al, 2
-	or	byte [ebp-4], al
+	shl	eax, 16
+	or	dword [ebp-4], eax
 
 	; secondary ATA / Slave
 	; Select drive
 	mov	al, ATA_Slave_drive
 	mov	dx, secondary_ATA_Drive_Select
 	out	dx, al
+	call	wait_40ns
 
 	mov	ebx, Identify_memory_location + 1536
 	call	Identify_secondary_disk
-	shl	al, 3
-	or	byte [ebp-4], al
+	shl	eax, 24
+	or	dword [ebp-4], eax
 
 	; exit
-	mov	al, [ebp-4]
+	mov	eax, [ebp-4]
 	add	esp, 4
+	ret
+
+
+wait_40ns:
+	mov	dx, primary_ATA_Status
+	mov	ah, 15
+
+wait_40ns_loop:
+	in	al, dx
+	dec	ah
+	jnz	wait_40ns_loop
+
 	ret
 
 ; primary ATA bus
@@ -101,15 +129,23 @@ Identify_primary_disk:
 	out	dx, al
 
 	; send the Identify command
-	mov	al, 0xec
+	mov	al, ATA_IDENTIFY
 	mov	dx, primary_ATA_Command
 	out	dx, al
 
+
+Identify_primary_loop4:
 	; same register for command and status
 	in	al, dx
 
-	cmp	al, 0
-	je	Identify_primary_error
+	or	al, al
+	jz	Identify_primary_error
+
+	test	al, 1	; test error bit
+	jnz	Identify_primary_aborted
+
+	test	al, 8	; test DRQ bit
+	jz	Identify_primary_loop4
 
 Identify_primary_loop0:
 	test	al, 0x80
@@ -153,11 +189,47 @@ Identify_primary_loop3:
 	cmp	bx, 0
 	jne short Identify_primary_loop2
 
-	mov	al, 1	; Disk found
+	mov	eax, Device_ATA	; Disk found
 	ret
 
+Identify_primary_aborted:
+	; get the drive signature
+	mov	dx, primary_ATA_IO_base + 5
+	in	al, dx
+	mov	ah, al
+
+	mov	dx, primary_ATA_IO_base + 4
+	in	al, dx
+
+
+	mov	bl, Device_Unknowed
+
+	cmp	ax, 0xeb14
+	jne	Identify_primary_skip0
+	mov	ebx, Device_PATAPI
+Identify_primary_skip0:
+
+	cmp	ax, 0x9669
+	jne	Identify_primary_skip1
+	mov	ebx, Device_SATAPI
+Identify_primary_skip1:
+
+	cmp	ax, 0x0000
+	jne	Identify_primary_skip2
+	mov	ebx, Device_PATA
+Identify_primary_skip2:
+
+	cmp	ax, 0xc33c
+	jne	Identify_primary_skip3
+	mov	ebx, Device_SATA
+Identify_primary_skip3:
+
+	mov	eax, ebx
+	ret	
+
+
 Identify_primary_error:
-mov	al, 0	; 0 Disk not found
+mov	eax, 0	; 0 Disk not found
 	ret
 
 ; Secondary ATA bus
@@ -176,15 +248,22 @@ Identify_secondary_disk:
 	out	dx, al
 
 	; send the Identify command
-	mov	al, 0xec
+	mov	al, ATA_IDENTIFY
 	mov	dx, secondary_ATA_Command
 	out	dx, al
 
+Identify_secondary_loop4:
 	; same register for command and status
 	in	al, dx
 
-	cmp	al, 0
-	je	Identify_secondary_error
+	or	al, al
+	jz	Identify_primary_error
+
+	test	al, 1	; test error bit
+	jnz	Identify_primary_aborted
+
+	test	al, 8	; test DRQ bit
+	jz	Identify_secondary_loop4
 
 Identify_secondary_loop0:
 	test	al, 0x80
@@ -228,9 +307,115 @@ Identify_secondary_loop3:
 	cmp	bx, 0
 	jne short Identify_secondary_loop2
 
-	mov	al, 1	; Disk found
+
+	mov	eax, Device_ATA	; Disk found
 	ret
 
+Identify_secondary_aborted:
+	; get the drive signature
+	mov	dx, secondary_ATA_IO_base + 5
+	in	al, dx
+	mov	ah, al
+
+	mov	dx, secondary_ATA_IO_base + 4
+	in	al, dx
+
+	mov	bl, Device_Unknowed
+
+	cmp	ax, 0xeb14
+	jne	Identify_secondary_skip0
+	mov	ebx, Device_PATAPI
+Identify_secondary_skip0:
+
+	cmp	ax, 0x9669
+	jne	Identify_secondary_skip1
+	mov	ebx, Device_SATAPI
+Identify_secondary_skip1:
+
+	cmp	ax, 0x0000
+	jne	Identify_secondary_skip2
+	mov	ebx, Device_PATA
+Identify_secondary_skip2:
+
+	cmp	ax, 0xc33c
+	jne	Identify_secondary_skip3
+	mov	ebx, Device_SATA
+Identify_secondary_skip3:
+
+	mov	eax, ebx
+	ret	
+
 Identify_secondary_error:
-mov	al, 0	; 0 Disk not found
+	mov	eax, 0	; 0 Disk not found
+	ret
+
+global ATA_PIO_read
+ATA_PIO_read:
+	;1
+	mov	dx, primary_ATA_Drive_Select
+	mov	al, 0xe0
+	out	dx, al
+
+	;2
+	call	wait_40ns
+
+	;3	sector count
+	mov	dx, primary_ATA_sector_count
+	mov	al, 1
+	out	dx, al
+
+	;4~6	LBA
+	mov	dx, primary_ATA_LBA_lo
+	mov	al, 0
+	out	dx, al
+
+	mov	dx, primary_ATA_LBA_mid
+	mov	al, 0
+	out	dx, al
+
+	mov	dx, primary_ATA_LBA_hi
+	mov	al, 0
+	out	dx, al
+
+	;7	read command
+	mov	dx, primary_ATA_Command
+	mov	al, ATA_PIO_READ
+	out	dx, al
+
+
+	mov	bx, 256		; counter
+	mov	edi, 0x8fe00	; destination
+
+ATA_PIO_read_loop:
+	mov	dx, primary_ATA_Status
+	in	al, dx
+
+	; test for error
+	mov	ah, al
+	test	ah, 0x01
+	jnz	Error
+
+	; wait until drive is ready
+	mov	ah, al
+	and	al, 0x80
+	and	ah, 0x08
+	xor	ah, 0x08 ; wait until it set
+
+	or	al, ah
+	jnz	ATA_PIO_read_loop
+
+	mov	dx, primary_ATA_Data
+	in	ax, dx
+	mov	[edi], ax
+
+	; increment to next loop
+	add	edi, 2
+	dec	bx
+	jnz	ATA_PIO_read_loop
+
+	mov	eax, 0
+	ret
+
+Error:	; default error handler
+	mov	eax, 1
 	ret

@@ -639,7 +639,7 @@ isr_stub_irq13:
 	sti
 	iret
 
-isr_stub_irq14: ; primary ATA bus
+isr_stub_irq14: ; 1st disk controller
 	pushad
 
 	;mov	al, 0x3e
@@ -653,11 +653,11 @@ isr_stub_irq14: ; primary ATA bus
 	sti
 	iret
 
-isr_stub_irq15:
+isr_stub_irq15: ; 2nd disk controller
 	pushad
 
-	mov	al, 0x3f
-	call	exception_handler
+	;mov	al, 0x3f
+	;call	exception_handler
 
 	mov	al, 0x20
 	out	0x20, al
