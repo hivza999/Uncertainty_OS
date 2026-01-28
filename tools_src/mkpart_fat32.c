@@ -138,7 +138,7 @@ int main()
 	fat32_bios_parameter.bootjmp[0] = 0xeb;
 	fat32_bios_parameter.bootjmp[1] = 0xfe;
 	fat32_bios_parameter.bootjmp[2] = 0x90;
-	for (uint32_t i; i < 8; i++)
+	for (uint32_t i = 0; i < 8; i++)
 	{
 		fat32_bios_parameter.identifier[i] = "UncertFS"[i];
 	}
