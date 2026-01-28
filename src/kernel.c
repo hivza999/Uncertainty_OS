@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "drivers/display/text.h"
 #include "drivers/storage/ata.h"
+#include "drivers/partition_table/mbr.h"
 
 #define memory_map 0x8000
 #define memory_map_entries memory_map + 4
@@ -101,6 +102,29 @@ extern void main()
 				print("Unknow\n", 0x0f);
 				break;
 			}
+		}
+	}
+
+	partition_t partitions[4];
+
+	if (mbr_get_partition(partitions))
+	{
+		print("Error, while getting partition table\n", 0x0f);
+		while (1)
+			;
+	}
+
+	for (uint8_t i = 0; i < 4; i++)
+	{
+		if (partitions[i].present)
+		{
+			print("partition ", 0x0f);
+			echo(i + '0', 0x0f);
+			print("\n  Start: ", 0x0f);
+			hexprint32(partitions[i].LBA_start, 0x0f);
+			print("\n  size: ", 0x0f);
+			print_size_B(partitions[i].sector_count * 512, 0x0f);
+			echo('\n', 0x0f);
 		}
 	}
 
