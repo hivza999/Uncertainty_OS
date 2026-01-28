@@ -4,6 +4,7 @@
 #include "drivers/display/text.h"
 #include "drivers/storage/ata.h"
 #include "drivers/partition_table/mbr.h"
+#include "drivers/filesystem/fat.h"
 
 #define memory_map 0x8000
 #define memory_map_entries memory_map + 4
@@ -113,6 +114,8 @@ extern void main()
 		while (1)
 			;
 	}
+	hexprint32((uint32_t)&partitions[0], 0x0f);
+	echo('\n', 0x0f);
 
 	for (uint8_t i = 0; i < 4; i++)
 	{
@@ -127,6 +130,18 @@ extern void main()
 			echo('\n', 0x0f);
 		}
 	}
+
+	if (!partitions[0].present)
+	{
+		print("Partition 1 of disk is not present\n", 0x0f);
+		while (1)
+			;
+	}
+
+	FAT_filesystem_t FAT_filesystem;
+	FAT_init_partition(&partitions[0], &FAT_filesystem);
+
+	FAT_ls("/", &FAT_filesystem);
 
 	uint8_t local_keycode_register = *keycode_register;
 	while (true)

@@ -16,7 +16,7 @@ int mbr_get_partition(partition_t paritions[4])
 {
 	uint8_t buffer[512];
 	pio_read_packet_t pio_read_packet;
-	pio_read_packet.LBA = 0 | 0xe0000000;
+	pio_read_packet.LBA = 0 | ATA_Drive_select_master;
 	pio_read_packet.sector_count = 1;
 	pio_read_packet.buffer = buffer;
 

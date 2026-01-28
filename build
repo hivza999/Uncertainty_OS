@@ -71,7 +71,10 @@ build_kernel () {
 	nasm "src/drivers/storage/ata.s" -f elf -o "bin/tmp/drivers/storage__ata.o"
 
 	#partition tables
-	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/partition_table/mbr.c' -o bin/tmp/drivers/parition_table_mbr.o
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/partition_table/mbr.c' -o bin/tmp/drivers/parition_table__mbr.o
+
+	#filesystem
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/filesystem/fat.c' -o bin/tmp/drivers/filesystem__fat.o
 
 	# link
 	i686-elf-ld -o bin/part/kernel -Ttext 0x0500 \
@@ -80,7 +83,8 @@ build_kernel () {
 	'bin/tmp/interrupts/idt.o' 'bin/tmp/interrupts/isr.o' 'bin/tmp/interrupts/pic.o' \
 	'bin/tmp/drivers/display__text.o' \
 	'bin/tmp/drivers/storage__ata.o' \
-	'bin/tmp/drivers/parition_table_mbr.o' \
+	'bin/tmp/drivers/parition_table__mbr.o' \
+	'bin/tmp/drivers/filesystem__fat.o' \
 	\
 	--oformat binary
 
