@@ -114,8 +114,6 @@ extern void main()
 		while (1)
 			;
 	}
-	hexprint32((uint32_t)&partitions[0], 0x0f);
-	echo('\n', 0x0f);
 
 	for (uint8_t i = 0; i < 4; i++)
 	{
