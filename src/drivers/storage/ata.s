@@ -383,8 +383,11 @@ ATA_PIO_read:
 	mov	al, ATA_PIO_READ
 	out	dx, al
 
+	; counter
+	xor	ebx, ebx	; clear eebx
+	mov	bl, [esi+8]	; get sector count
+	shl	ebx, 8		; multiply by 256 (512 / 2 since reading 16 bits word)
 
-	mov	bx, 256		; counter
 	mov	edi, [esi+4]	; destination
 
 ATA_PIO_read_loop:
@@ -411,7 +414,7 @@ ATA_PIO_read_loop:
 
 	; increment to next loop
 	add	edi, 2
-	dec	bx
+	dec	ebx
 	jnz	ATA_PIO_read_loop
 
 	mov	eax, 0
