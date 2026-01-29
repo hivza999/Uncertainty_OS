@@ -57,10 +57,6 @@ int FAT_ls(char *path, FAT_filesystem_t *filesystem)
 	4 > Disk error
 	*/
 
-	print("\n> ");
-	print(path);
-	echo('\n');
-
 	int32_t cluster_id = get_cluster_id(path, filesystem);
 
 	if (cluster_id < 0)

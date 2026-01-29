@@ -150,11 +150,35 @@ extern void main()
 	ls("/", &FAT_filesystem);
 
 	uint8_t local_keycode_register = *keycode_register;
+	char input_buffer[1024];
+	uint16_t input_buffer_index = 0;
 	while (true)
 	{
 		while (*keycode_register != local_keycode_register)
 		{
 			echo(keycode_buffer[local_keycode_register]);
+			switch (keycode_buffer[local_keycode_register])
+			{
+			case '\n':
+				input_buffer[input_buffer_index] = 0;
+				input_buffer_index = 0;
+				ls(input_buffer, &FAT_filesystem);
+				break;
+
+			case '\b':
+				input_buffer_index--;
+				break;
+
+			default:
+				input_buffer[input_buffer_index] = keycode_buffer[local_keycode_register];
+				input_buffer_index++;
+				if (input_buffer_index == sizeof(input_buffer))
+				{
+					echo('\b');
+					input_buffer_index--;
+				}
+				break;
+			}
 			local_keycode_register++;
 		}
 	}
@@ -163,6 +187,10 @@ extern void main()
 
 void ls(char *path, FAT_filesystem_t *FAT_filesystem)
 {
+	print("> ");
+	print(path);
+	echo('\n');
+
 	uint32_t error = FAT_ls(path, FAT_filesystem);
 
 	if (error)
@@ -194,4 +222,6 @@ void ls(char *path, FAT_filesystem_t *FAT_filesystem)
 
 		cursor_color(0x0f);
 	}
+
+	echo('\n');
 }
