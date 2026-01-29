@@ -4,7 +4,7 @@
 #include "fat.h"
 
 int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesystem, uint32_t Cluster_id);
-void print_name_fat_entry(DirEntry_t entry, uint8_t color);
+void print_name_fat_entry(DirEntry_t entry);
 int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem);
 int cmp_str_fat_entry(DirEntry_t entry, char *name);
 
@@ -32,7 +32,7 @@ int FAT_init_partition(partition_t *partition, FAT_filesystem_t *filesystem)
 
 		if (ATA_PIO_read(&pio_read_packet))
 		{
-			print("Error reading disk while initialasing filesystem\n", 0x0f);
+			print("Error reading disk while initialasing filesystem\n");
 			while (1)
 				;
 		}
@@ -50,30 +50,22 @@ int FAT_init_partition(partition_t *partition, FAT_filesystem_t *filesystem)
 
 int FAT_ls(char *path, FAT_filesystem_t *filesystem)
 {
-	print("\n> ", 0x0f);
-	print(path, 0x0f);
-	echo('\n', 0x0f);
+	/*
+	1 > Folder not found
+	2 > Not a directory
+	3 > Invalid path
+	4 > Disk error
+	*/
+
+	print("\n> ");
+	print(path);
+	echo('\n');
 
 	int32_t cluster_id = get_cluster_id(path, filesystem);
 
 	if (cluster_id < 0)
 	{
-		switch (cluster_id)
-		{
-		case -1:
-			print("Folder not found\n", 0x0f);
-			break;
-		case -2:
-			print("Not a directory\n", 0x0f);
-			break;
-		case -3:
-			print("Invalid path\n", 0x0f);
-			break;
-
-		default:
-			break;
-		}
-		return (1);
+		return (-cluster_id);
 	}
 
 	DirEntry_t root_dir[filesystem->cluster_size * (512 / sizeof(DirEntry_t))];
@@ -101,8 +93,8 @@ int FAT_ls(char *path, FAT_filesystem_t *filesystem)
 		if (root_dir[i].Name[0] == 0xe5)
 			continue;
 
-		print_name_fat_entry(root_dir[i], 0x0f);
-		echo('\n', 0x0f);
+		print_name_fat_entry(root_dir[i]);
+		echo('\n');
 	}
 
 	return (0);
@@ -184,7 +176,7 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	return (cluster_id);
 }
 
-void print_name_fat_entry(DirEntry_t entry, uint8_t color)
+void print_name_fat_entry(DirEntry_t entry)
 {
 	int32_t l = 8;
 	while (entry.Name[l - 1] == ' ')
@@ -195,7 +187,7 @@ void print_name_fat_entry(DirEntry_t entry, uint8_t color)
 	uint8_t i = 0;
 	for (i; i < l; i++)
 	{
-		echo(entry.Name[i], color);
+		echo(entry.Name[i]);
 	}
 
 	// extention
@@ -207,16 +199,16 @@ void print_name_fat_entry(DirEntry_t entry, uint8_t color)
 
 	if (l != 0)
 	{
-		echo('.', color);
+		echo('.');
 		i = 0;
 		for (i; i < l; i++)
 		{
-			echo(entry.Extention[i], color);
+			echo(entry.Extention[i]);
 		}
 	}
 	if (entry.Attribute0 & ATTR_DIRECTORY)
 	{
-		echo('/', color);
+		echo('/');
 	}
 
 	return;
@@ -277,9 +269,9 @@ int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesyste
 	pio_read_packet->LBA = (filesystem->partition->LBA_start + filesystem->cluster_offset + filesystem->cluster_size * Cluster_id) | 0xe0000000;
 	if (ATA_PIO_read(pio_read_packet))
 	{
-		print("Error reading cluster 0x", 0x0f);
-		hexprint32(Cluster_id, 0x0f);
-		echo('\n', 0x0f);
+		print("Error reading cluster 0x");
+		hexprint32(Cluster_id);
+		echo('\n');
 		return (1);
 	}
 

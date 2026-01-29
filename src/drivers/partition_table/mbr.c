@@ -14,6 +14,10 @@ typedef struct
 
 int mbr_get_partition(partition_t paritions[4])
 {
+	/*
+	1 > Error reading disk
+	*/
+
 	uint8_t buffer[512];
 	pio_read_packet_t pio_read_packet;
 	pio_read_packet.LBA = 0 | ATA_Drive_select_master;
@@ -22,7 +26,6 @@ int mbr_get_partition(partition_t paritions[4])
 
 	if (ATA_PIO_read(&pio_read_packet))
 	{
-		print("Unable to read disk", 0x0f);
 		return (1);
 	}
 

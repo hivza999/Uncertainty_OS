@@ -23,9 +23,11 @@ const uint8_t *keycode_buffer = (uint8_t *)0x90500;
 
 const uint16_t *Disk_ATA_INDETIFY = (uint16_t *)0x90600;
 
+void ls(char *path, FAT_filesystem_t *FAT_filesystem);
+
 extern void main()
 {
-	print("Welcome to Uncertainty OS!\n\n", 0x0f);
+	print("Welcome to Uncertainty OS!\n\n");
 
 	{ // calculate amount of usable memory
 		uint32_t total_memory = 0;
@@ -45,13 +47,13 @@ extern void main()
 			}
 		}
 		// print it
-		print_size_B(total_memory, 0x0f);
-		print(" usable memory\n", 0x0f);
+		print_size_B(total_memory);
+		print(" usable memory\n");
 	}
 	{ // ATA PIO driver
-		print("Initializing ATA PIO driver...\n", 0x0f);
+		print("Initializing ATA PIO driver...\n");
 		uint32_t Detected_drives = ATA_init();
-		print("ATA PIO driver initilized\n", 0x0f);
+		print("ATA PIO driver initilized\n");
 
 		for (uint8_t i = 0; i < 4; i++)
 		{
@@ -59,14 +61,14 @@ extern void main()
 			{
 				continue;
 			}
-			print("Storage device ", 0x0f);
-			echo(i + '0', 0x0f);
-			print("\n  Device type: ", 0x0f);
+			print("Storage device ");
+			echo(i + '0');
+			print("\n  Device type: ");
 
 			switch (((uint8_t *)&Detected_drives)[i])
 			{
 			case Device_ATA:
-				print("ATA\n  LBA48 ", 0x0f);
+				print("ATA\n  LBA48 ");
 
 				uint64_t Device_size;
 				if (*(uint16_t *)&(Disk_ATA_INDETIFY[256 * i + 83]) & (1 << 10))
@@ -76,79 +78,120 @@ extern void main()
 				else
 				{
 					Device_size = *(uint32_t *)&(Disk_ATA_INDETIFY[256 * i + 60]) * 512;
-					print("un", 0x0f);
+					print("un");
 				}
-				print("supported\n  Device size: ", 0x0f);
-				print_size_B(Device_size, 0x0f); // print size of the disk
-				echo('\n', 0x0f);
+				print("supported\n  Device size: ");
+				print_size_B(Device_size); // print size of the disk
+				echo('\n');
 				break;
 
 			case Device_PATAPI:
-				print("PATAPI\n", 0x0f);
+				print("PATAPI\n");
 				break;
 
 			case Device_SATAPI:
-				print("SATAPI\n", 0x0f);
+				print("SATAPI\n");
 				break;
 
 			case Device_PATA:
-				print("PATA\n", 0x0f);
+				print("PATA\n");
 				break;
 
 			case Device_SATA:
-				print("SATA\n", 0x0f);
+				print("SATA\n");
 				break;
 
 			case Device_Unknowed:
-				print("Unknow\n", 0x0f);
+				print("Unknow\n");
 				break;
 			}
 		}
+		if ((uint8_t)Detected_drives != Device_ATA)
+		{
+			cursor_color(0x0c);
+			print("Wrong disk type for disk 0\n> Must be an ATA device\n");
+			return;
+		}
 	}
 
+	print("Getting partition info...\n");
 	partition_t partitions[4];
-
 	if (mbr_get_partition(partitions))
 	{
-		print("Error, while getting partition table\n", 0x0f);
-		while (1)
-			;
+		cursor_color(0x0c);
+		print("Disk error\n");
+		return;
 	}
 
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		if (partitions[i].present)
 		{
-			print("partition ", 0x0f);
-			echo(i + '0', 0x0f);
-			print("\n  Start: ", 0x0f);
-			hexprint32(partitions[i].LBA_start, 0x0f);
-			print("\n  size: ", 0x0f);
-			print_size_B(partitions[i].sector_count * 512, 0x0f);
-			echo('\n', 0x0f);
+			print("partition ");
+			echo(i + '0');
+			print("\n  Start: ");
+			hexprint32(partitions[i].LBA_start);
+			print("\n  size: ");
+			print_size_B(partitions[i].sector_count * 512);
+			echo('\n');
 		}
 	}
 
 	if (!partitions[0].present)
 	{
-		print("Partition 1 of disk is not present\n", 0x0f);
-		while (1)
-			;
+		cursor_color(0x0c);
+		print("Partition 1 of disk 0 is not present\n");
+		return;
 	}
 
 	FAT_filesystem_t FAT_filesystem;
 	FAT_init_partition(&partitions[0], &FAT_filesystem);
 
-	FAT_ls("/", &FAT_filesystem);
+	ls("/", &FAT_filesystem);
 
 	uint8_t local_keycode_register = *keycode_register;
 	while (true)
 	{
 		while (*keycode_register != local_keycode_register)
 		{
-			echo(keycode_buffer[local_keycode_register], 0x0f);
+			echo(keycode_buffer[local_keycode_register]);
 			local_keycode_register++;
 		}
 	}
 	return;
+}
+
+void ls(char *path, FAT_filesystem_t *FAT_filesystem)
+{
+	uint32_t error = FAT_ls(path, FAT_filesystem);
+
+	if (error)
+	{
+		cursor_color(0x0c);
+
+		switch (error)
+		{
+		case 1:
+			print("Folder not found\n");
+			break;
+
+		case 2:
+			print("Not a directory\n");
+			break;
+
+		case 3:
+			print("Invalid path\n");
+			break;
+
+		case 4:
+			print("Disk error\n");
+			break;
+
+		default:
+			print("Unknowed error");
+			break;
+		}
+
+		cursor_color(0x0f);
+	}
 }
