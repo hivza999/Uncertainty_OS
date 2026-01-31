@@ -147,7 +147,7 @@ extern void main()
 	FAT_filesystem_t FAT_filesystem;
 	FAT_init_partition(&partitions[0], &FAT_filesystem);
 
-	ls("/", &FAT_filesystem);
+	echo('\n');
 
 	uint8_t local_keycode_register = *keycode_register;
 	char input_buffer[1024];
@@ -165,8 +165,19 @@ extern void main()
 				ls(input_buffer, &FAT_filesystem);
 				break;
 
+			case 0x1b:
+				input_buffer_index = 0;
+				break;
+
 			case '\b':
-				input_buffer_index--;
+				if (input_buffer_index > 0)
+				{
+					input_buffer_index--;
+				}
+				else
+				{
+					echo(' ');
+				}
 				break;
 
 			default:
