@@ -1,7 +1,7 @@
 isr_stub_0:	; divisde by 0
 	pushad
 	mov	al, 0
-	;call	exception_handler
+	call	exception_handler
 	popad
 	sti
 	iret
@@ -48,11 +48,27 @@ isr_stub_5:
 
 isr_stub_6:
 	pushad
-	mov	al, 6
-	call	exception_handler
+	
+	mov	edi, 0xb8000
+	mov	esi, isr_stub_6_error
+	mov	ah, 0x0c
+
+isr_stub_6_loop:
+	mov	al, [esi]
+	mov	[edi], ax
+
+	inc	esi
+	add	edi, 2
+
+	or	al, al
+	jnz	isr_stub_6_loop
+
 	popad
 	sti
 	iret
+
+isr_stub_6_error:
+dw	"Invalid opcode!", 0
 
 isr_stub_7:
 	pushad
