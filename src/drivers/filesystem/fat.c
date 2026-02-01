@@ -105,6 +105,8 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	-3 > invalid path
 	*/
 
+	uint8_t attributes = ATTR_DIRECTORY; // to prevent interpreting files as directories
+
 	DirEntry_t Dir_entries[filesystem->cluster_size * (512 / sizeof(DirEntry_t))];
 	pio_read_packet_t pio_read_packet;
 	pio_read_packet.buffer = &Dir_entries;
@@ -122,6 +124,11 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 
 	while (path[path_index] != 0)
 	{
+		if (!(attributes & ATTR_DIRECTORY))
+		{
+			return (-2);
+		}
+
 		while (path[path_index] != '/')
 		{
 			if (path[path_index] == 0)
@@ -154,15 +161,8 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 			}
 			if (cmp_str_fat_entry(Dir_entries[i], current_path))
 			{
-				if (Dir_entries[i].Attribute0 & ATTR_DIRECTORY)
-				{
-					cluster_id = (Dir_entries[i].cluster_nb_high << 16) + Dir_entries[i].cluster_nb_low;
-					break;
-				}
-				else
-				{
-					return (-2);
-				}
+				cluster_id = (Dir_entries[i].cluster_nb_high << 16) + Dir_entries[i].cluster_nb_low;
+				break;
 			}
 		}
 
