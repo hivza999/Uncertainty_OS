@@ -1,10 +1,6 @@
 #include <stdint.h>
 #include "text.h"
 
-#define VIDEO_MEMORY 0xb8000
-#define Scren_Width 80
-#define Scren_Height 25
-
 static uint32_t Cursor = VIDEO_MEMORY;
 static uint8_t Cursor_color = 0x0f;
 
@@ -121,7 +117,7 @@ void print(char *string)
 
 void echo(char value)
 {
-	*(char *)(Cursor + 1) = 0x0f;
+	*(uint8_t *)(Cursor + 1) = Cursor_color;
 
 	switch (value)
 	{
@@ -155,7 +151,7 @@ void echo(char value)
 		screen_scroll(1);
 	}
 
-	*(char *)(Cursor + 1) = 0xf0;
+	*(uint8_t *)(Cursor + 1) = 0xf0;
 }
 
 void screen_scroll(uint8_t lines)

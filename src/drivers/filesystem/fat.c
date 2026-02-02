@@ -4,9 +4,8 @@
 #include "fat.h"
 
 int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesystem, uint32_t Cluster_id);
-void print_name_fat_entry(DirEntry_t entry);
 int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem);
-int cmp_str_fat_entry(DirEntry_t entry, char *name);
+uint8_t lfn_checksum(char name[13]);
 
 #define ATTR_READ_ONLY 0x01
 #define ATTR_HIDDEN 0x02
@@ -15,10 +14,17 @@ int cmp_str_fat_entry(DirEntry_t entry, char *name);
 #define ATTR_DIRECTORY 0x10
 #define ATTR_LFN 0x0f
 
-typedef struct
+typedef struct LfnEntry
 {
-	uint8_t Data[4096];
-} Cluster_t;
+	uint8_t sequence_id;
+	uint16_t name0[5];
+	uint8_t attribute;
+	uint8_t type;
+	uint8_t checksum;
+	uint16_t name1[6];
+	uint16_t first_cluster;
+	uint16_t name2[2];
+} __attribute__((packed)) LfnEntry_t;
 
 int FAT_init_partition(partition_t *partition, FAT_filesystem_t *filesystem)
 {
@@ -75,6 +81,7 @@ int FAT_ls(char *path, FAT_filesystem_t *filesystem)
 			;
 	}
 
+	char name[256];
 	for (uint32_t i = 0; i < filesystem->cluster_size * (512 / sizeof(DirEntry_t)); i++)
 	{
 		if (root_dir[i].Attribute0 & ATTR_VOLUME_LABEL)
@@ -87,9 +94,21 @@ int FAT_ls(char *path, FAT_filesystem_t *filesystem)
 		}
 
 		if (root_dir[i].Name[0] == 0xe5)
+		{
 			continue;
+		}
 
-		print_name_fat_entry(root_dir[i]);
+		if (get_entry_name(root_dir, i, name))
+		{
+			continue;
+		}
+
+		print(name);
+		if (root_dir[i].Attribute0 & ATTR_DIRECTORY)
+		{
+			echo('/');
+		}
+
 		echo('\n');
 	}
 
@@ -145,6 +164,7 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 
 		Read_Cluster(&pio_read_packet, filesystem, cluster_id);
 
+		char name[256];
 		for (uint32_t i = 0; i < filesystem->cluster_size * (512 / sizeof(DirEntry_t)); i++)
 		{
 			if (Dir_entries[i].Name[0] == 0)
@@ -159,9 +179,26 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 			{
 				continue;
 			}
-			if (cmp_str_fat_entry(Dir_entries[i], current_path))
+
+			if (get_entry_name(Dir_entries, i, name))
 			{
-				cluster_id = (Dir_entries[i].cluster_nb_high << 16) + Dir_entries[i].cluster_nb_low;
+				continue;
+			}
+
+			uint32_t j = 0;
+			bool found = false;
+			while (current_path[j] == name[j])
+			{
+				if (current_path[j] == 0)
+				{
+					cluster_id = (Dir_entries[i].cluster_nb_high << 16) + Dir_entries[i].cluster_nb_low;
+					found = true;
+					break;
+				}
+				j++;
+			}
+			if (found)
+			{
 				break;
 			}
 		}
@@ -172,92 +209,108 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	return (cluster_id);
 }
 
-void print_name_fat_entry(DirEntry_t entry)
+int get_entry_name(DirEntry_t *entries, int32_t id, char *name)
 {
+	if (id)
+	{
+		if (entries[id - 1].Attribute0 == ATTR_LFN && ((LfnEntry_t *)entries)[id - 1].checksum == lfn_checksum((char *)&entries[id]))
+		{ // LFN detected
+
+			int8_t offset = 1;
+			uint8_t sequence_id = 0;
+			uint16_t j = 0;
+
+			while (((LfnEntry_t *)entries)[id - offset].sequence_id > sequence_id)
+			{
+				sequence_id = ((LfnEntry_t *)entries)[id - offset].sequence_id;
+
+				for (uint32_t i = 0; i < 5; i++)
+				{
+					name[j] = (char)((LfnEntry_t *)entries)[id - offset].name0[i];
+					if (!name[j])
+					{
+						return (0);
+					}
+					j++;
+				}
+				for (uint32_t i = 0; i < 6; i++)
+				{
+					name[j] = (char)((LfnEntry_t *)entries)[id - offset].name1[i];
+					if (!name[j])
+					{
+						return (0);
+					}
+					j++;
+				}
+				for (uint32_t i = 0; i < 2; i++)
+				{
+					name[j] = (char)((LfnEntry_t *)entries)[id - offset].name2[i];
+					if (!name[j])
+					{
+						return (0);
+					}
+					j++;
+				}
+				if (sequence_id & (1 << 6))
+				{
+					return (0);
+				}
+				offset++;
+			}
+			return (1);
+		}
+	}
+	uint32_t i = 0;
 	int32_t l = 8;
-	while (entry.Name[l - 1] == ' ')
+	uint8_t Case = (entries[id].Attribute1 & (1 << 3)) << 2; // 0x20 offset if the name is lowercase
+
+	while (entries[id].Name[l - 1] == ' ')
 	{
 		l--;
 	}
 
-	uint8_t i = 0;
-	for (i; i < l; i++)
+	uint8_t j = 0;
+	for (j; j < l; j++)
 	{
-		echo(entry.Name[i]);
+		if ('A' <= entries[id].Name[j] < 'Z')
+		{
+			name[i] = entries[id].Name[j] + Case;
+		}
+		else
+		{
+			name[i] = entries[id].Name[j];
+		}
+		i++;
 	}
 
 	// extention
 	l = 3;
-	while (entry.Extention[l - 1] == ' ' && l > 0)
+	while (entries[id].Extention[l - 1] == ' ' && l > 0)
 	{
 		l--;
 	}
 
 	if (l != 0)
 	{
-		echo('.');
-		i = 0;
-		for (i; i < l; i++)
+		Case = (entries[id].Attribute1 & (1 << 4)) << 1; // 0x20 offset if the extention is lowercase
+		name[i] = '.';
+		i++;
+		j = 0;
+		for (j; j < l; j++)
 		{
-			echo(entry.Extention[i]);
-		}
-	}
-	if (entry.Attribute0 & ATTR_DIRECTORY)
-	{
-		echo('/');
-	}
-
-	return;
-}
-
-int cmp_str_fat_entry(DirEntry_t entry, char *name)
-{
-	int32_t l = 8;
-	while (entry.Name[l - 1] == ' ')
-	{
-		l--;
-	}
-
-	uint32_t entry_index = 0;
-	uint32_t name_index = 0;
-
-	while (entry_index < l)
-	{
-		if (entry.Name[entry_index] != name[name_index])
-		{
-			return (0);
-		}
-		entry_index++;
-		name_index++;
-	}
-	l = 3;
-	while (entry.Extention[l - 1] == ' ' && l != 0)
-	{
-		l--;
-	}
-	if (l == 0)
-	{
-		return (name[name_index] == 0);
-	}
-	else
-	{
-		if (name[name_index] != '.')
-		{
-			return (0);
-		}
-		name_index++;
-
-		while (entry_index < l)
-		{
-			if (entry.Extention[entry_index] != name[name_index])
+			if ('A' <= entries[id].Extention[j] < 'Z')
 			{
-				return (0);
+				name[i] = entries[id].Extention[j] + Case;
 			}
-			entry_index++;
-			name_index++;
+			else
+			{
+				name[i] = entries[id].Extention[j];
+			}
+			i++;
 		}
-		return (name[name_index] == 0);
 	}
+	name[i] = 0;
+	return (0);
 }
 
 int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesystem, uint32_t Cluster_id)
@@ -272,4 +325,16 @@ int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesyste
 	}
 
 	return (0);
+}
+
+uint8_t lfn_checksum(char name[13])
+{
+	uint8_t sum = 0;
+
+	for (uint32_t i = 0; i < 11; i++)
+	{
+		sum = ((sum & 1) << 7) + (sum >> 1) + name[i];
+	}
+
+	return (sum);
 }

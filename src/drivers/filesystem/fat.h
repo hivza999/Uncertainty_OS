@@ -30,3 +30,5 @@ typedef struct DirEntry
 
 int FAT_init_partition(partition_t *partition, FAT_filesystem_t *filesystem);
 int FAT_ls(char *path, FAT_filesystem_t *filesystem);
+
+int get_entry_name(DirEntry_t *entry, int32_t id, char *name);
