@@ -341,7 +341,6 @@ int Read_Cluster(void *buffer, FAT_filesystem_t *filesystem, uint32_t Cluster_id
 	pio_read_packet.buffer = buffer;
 	pio_read_packet.LBA = (filesystem->partition.LBA_start + filesystem->cluster_offset + filesystem->cluster_size * Cluster_id) | 0xe0000000;
 	pio_read_packet.sector_count = filesystem->cluster_size;
-	pio_read_packet.sector_count = 1;
 
 	if (ATA_PIO_read(&pio_read_packet))
 	{
