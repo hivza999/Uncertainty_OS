@@ -4,7 +4,7 @@
 #include "drivers/display/text.h"
 #include "drivers/storage/ata.h"
 #include "drivers/partition_table/mbr.h"
-#include "drivers/filesystem/fat.h"
+#include "drivers/filesystem/filesystem.h"
 
 #define memory_map 0x8000
 #define memory_map_entries memory_map + 4
@@ -23,7 +23,8 @@ const uint8_t *keycode_buffer = (uint8_t *)0x90500;
 
 const uint16_t *Disk_ATA_INDETIFY = (uint16_t *)0x90600;
 
-void ls(char *path, FAT_filesystem_t *FAT_filesystem);
+void ls(char *path);
+int shell();
 
 extern void main()
 {
@@ -114,44 +115,92 @@ extern void main()
 		}
 	}
 
-	print("Getting partition info...\n");
-	partition_t partitions[4];
-	if (mbr_get_partition(partitions))
+	// if (0)
 	{
-		cursor_color(0x0c);
-		print("Disk error\n");
-		return;
-	}
-
-	for (uint8_t i = 0; i < 4; i++)
-	{
-		if (partitions[i].present)
+		print("Getting partition info...\n");
+		partition_t partitions[4];
+		if (mbr_get_partition(partitions))
 		{
-			print("partition ");
-			echo(i + '0');
-			print("\n  Start: ");
-			hexprint32(partitions[i].LBA_start);
-			print("\n  size: ");
-			print_size_B(partitions[i].sector_count * 512);
-			echo('\n');
+			cursor_color(0x0c);
+			print("Disk error\n");
+			return;
+		}
+
+		for (uint8_t i = 0; i < 4; i++)
+		{
+			if (partitions[i].present)
+			{
+				print("partition ");
+				echo(i + '0');
+				print("\n  Start: ");
+				hexprint32(partitions[i].LBA_start);
+				print("\n  size: ");
+				print_size_B(partitions[i].sector_count * 512);
+				echo('\n');
+			}
+		}
+
+		if (!partitions[0].present)
+		{
+			cursor_color(0x0c);
+			print("Partition 1 of disk 0 is not present\n");
+			return;
+		}
+
+		print("Filesystem init\n");
+		switch (filesystem_init(&partitions[0]))
+		{
+		case 1:
+			cursor_color(0x0c);
+			print("No filesystem found\n");
+			cursor_color(0x0f);
+			break;
+
+		case 2:
+			cursor_color(0x0c);
+			print("Error reading disk\n");
+			cursor_color(0x0c);
 		}
 	}
-
-	if (!partitions[0].present)
-	{
-		cursor_color(0x0c);
-		print("Partition 1 of disk 0 is not present\n");
-		return;
-	}
-
-	FAT_filesystem_t FAT_filesystem;
-	FAT_init_partition(&partitions[0], &FAT_filesystem);
-
 	echo('\n');
+
+	/*
+	{
+		uint32_t count = 0x9800;
+		uint8_t buffer[512];
+		pio_read_packet_t pio_read_packet;
+		pio_read_packet.sector_count = 1;
+		while (1)
+		{
+			pio_read_packet.buffer = &buffer;
+			pio_read_packet.LBA = count | 0xe0000000;
+			if (ATA_PIO_read(&pio_read_packet))
+			{
+				print("Error\n");
+				while (1)
+					;
+			}
+			hexprint32(count);
+			echo('\n');
+			count++;
+		}
+	}
+	//*/
+
+	shell();
+
+	return;
+}
+
+int shell()
+{
+	char *prompt = "> ";
 
 	uint8_t local_keycode_register = *keycode_register;
 	char input_buffer[1024];
 	uint16_t input_buffer_index = 0;
+	print(prompt);
+
 	while (true)
 	{
 		while (*keycode_register != local_keycode_register)
@@ -162,7 +211,8 @@ extern void main()
 			case '\n':
 				input_buffer[input_buffer_index] = 0;
 				input_buffer_index = 0;
-				ls(input_buffer, &FAT_filesystem);
+				ls(input_buffer);
+				print(prompt);
 				break;
 
 			case 0x1b:
@@ -193,45 +243,81 @@ extern void main()
 			local_keycode_register++;
 		}
 	}
-	return;
 }
 
-void ls(char *path, FAT_filesystem_t *FAT_filesystem)
+void ls(char *path)
 {
-	print("> ");
-	print(path);
-	echo('\n');
+	uint8_t buffer[0x1008];
+	Directory_t dir;
+	dir.buffer = &buffer;
+	dir.buffer_size = sizeof(buffer);
 
-	uint32_t error = FAT_ls(path, FAT_filesystem);
-
-	if (error)
 	{
-		cursor_color(0x0c);
-
-		switch (error)
+		int err = opendir(&dir, path);
+		if (err)
 		{
-		case 1:
-			print("Folder not found\n");
-			break;
+			cursor_color(0x0c);
+			print("Error openning directory: ");
+			switch (err)
+			{
+			case 2:
+				print("No filesystem found\n");
+				break;
 
-		case 2:
-			print("Not a directory\n");
-			break;
+			case 3:
+				print("Buffer is too small\n");
+				break;
 
-		case 3:
-			print("Invalid path\n");
-			break;
+			case 4:
+				print("No such file or directory\n");
+				break;
 
-		case 4:
-			print("Disk error\n");
-			break;
+			default:
+				print("Untrueknow error\n");
+			}
+			cursor_color(0x0f);
+			return;
+		}
+	}
 
-		default:
-			print("Unknowed error");
+	dir_entry_t dir_entry;
+	while (true)
+	{
+		{
+			int err = readdir(&dir, &dir_entry);
+			if (err)
+			{
+				cursor_color(0x0c);
+				print("Error reading directory: ");
+				switch (err)
+				{
+				case 2:
+					print("No filesystem found\n");
+					break;
+
+				case 3:
+					print("Disk error\n");
+					break;
+
+				default:
+					print("Unknow error\n");
+				}
+				cursor_color(0x0f);
+			}
+		}
+		if (dir_entry.name[0])
+		{
+			print(dir_entry.name);
+			if (dir_entry.type & dir_entry_ATTR_DIR)
+			{
+				echo('/');
+			}
+			echo('\n');
+		}
+		else
+		{
 			break;
 		}
-
-		cursor_color(0x0f);
 	}
 
 	echo('\n');

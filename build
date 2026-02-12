@@ -74,6 +74,7 @@ build_kernel () {
 	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/partition_table/mbr.c' -o bin/tmp/drivers/parition_table__mbr.o
 
 	#filesystem
+	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/filesystem/filesystem.c' -o bin/tmp/drivers/filesystem__filesystem.o
 	i686-elf-gcc -ffreestanding -m32 -g -c 'src/drivers/filesystem/fat.c' -o bin/tmp/drivers/filesystem__fat.o
 
 	# link
@@ -84,7 +85,7 @@ build_kernel () {
 	'bin/tmp/drivers/display__text.o' \
 	'bin/tmp/drivers/storage__ata.o' \
 	'bin/tmp/drivers/parition_table__mbr.o' \
-	'bin/tmp/drivers/filesystem__fat.o' \
+	'bin/tmp/drivers/filesystem__filesystem.o' 'bin/tmp/drivers/filesystem__fat.o' \
 	\
 	--oformat binary
 

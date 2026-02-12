@@ -1,5 +1,4 @@
 #include "../storage/ata.h"
-#include "../display/text.h"
 #include "mbr.h"
 
 typedef struct

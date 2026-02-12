@@ -1,20 +1,34 @@
-#include "../display/text.h"
 #include "../partition_table/partition.h"
 #include "../storage/ata.h"
 #include "fat.h"
+#include "filesystem.h"
 
-int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesystem, uint32_t Cluster_id);
-int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem);
-uint8_t lfn_checksum(char name[13]);
+#define FAT_ATTR_READ_ONLY 0x01
+#define FAT_ATTR_HIDDEN 0x02
+#define FAT_ATTR_SYSTEM 0x04
+#define FAT_ATTR_VOLUME_LABEL 0x08
+#define FAT_ATTR_DIRECTORY 0x10
+#define FAT_ATTR_LFN 0x0f
 
-#define ATTR_READ_ONLY 0x01
-#define ATTR_HIDDEN 0x02
-#define ATTR_SYSTEM 0x04
-#define ATTR_VOLUME_LABEL 0x08
-#define ATTR_DIRECTORY 0x10
-#define ATTR_LFN 0x0f
+typedef struct
+{
+	char Name[8];
+	char Extention[3];
+	uint8_t Attribute0;
+	uint8_t Attribute1;
+	uint8_t create_time_ms;
+	uint16_t create_time;
+	uint16_t create_date;
+	uint16_t access_date;
+	uint16_t cluster_nb_high;
+	uint16_t modified_time;
+	uint16_t modified_date;
+	uint16_t cluster_nb_low;
+	uint32_t size;
 
-typedef struct LfnEntry
+} __attribute__((packed)) FAT_Dir_Entry_t;
+
+typedef struct
 {
 	uint8_t sequence_id;
 	uint16_t name0[5];
@@ -26,97 +40,99 @@ typedef struct LfnEntry
 	uint16_t name2[2];
 } __attribute__((packed)) LfnEntry_t;
 
-int FAT_init_partition(partition_t *partition, FAT_filesystem_t *filesystem)
+int Read_Cluster(void *buffer, FAT_filesystem_t *filesystem, uint32_t Cluster_id);
+int get_entry_name(FAT_Dir_Entry_t *entries, int32_t id, char *name);
+int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem);
+uint8_t lfn_checksum(char name[13]);
+
+uint32_t FAT_get_DIR_buffer_size(filesystem_t *filesystem)
 {
-	{ // get the filesystem info
-		uint8_t buffer[512];
+	return (((FAT_filesystem_t *)filesystem->filesystem_data)->cluster_size * 512 + sizeof(FAT_Directory_t));
+}
 
-		pio_read_packet_t pio_read_packet;
-		pio_read_packet.LBA = partition->LBA_start | 0xe0000000;
-		pio_read_packet.sector_count = 1;
-		pio_read_packet.buffer = buffer;
+int FAT_opendir(filesystem_t *filesystem, Directory_t *Directory, char *path)
+{
+	/*
+	3 > buffer size too small
+	4 > No such file or directory
+	5 > Not a directory
+	*/
 
-		if (ATA_PIO_read(&pio_read_packet))
-		{
-			print("Error reading disk while initialasing filesystem\n");
-			while (1)
-				;
-		}
-
-		// in sector
-		filesystem->cluster_size = buffer[0x0d];
-		filesystem->fat_offset = *((uint16_t *)&buffer[0x0e]);
-		filesystem->cluster_offset = buffer[0x10] * *((uint32_t *)&buffer[0x24]) + filesystem->fat_offset - filesystem->cluster_size * 2;
-		filesystem->root_dir_cluster = *((uint32_t *)&buffer[0x2c]);
-		filesystem->partition = partition;
+	if (Directory->buffer_size < FAT_get_DIR_buffer_size(filesystem))
+	{
+		return (3);
 	}
 
+	((FAT_Directory_t *)Directory->buffer)->index = 0;
+	((FAT_Directory_t *)Directory->buffer)->Cluster_id = get_cluster_id(path, (FAT_filesystem_t *)filesystem->filesystem_data);
+
+	if ((int32_t)((FAT_Directory_t *)Directory->buffer)->Cluster_id < 0)
+	{
+		switch ((int32_t)((FAT_Directory_t *)Directory->buffer)->Cluster_id)
+		{
+		case -1:
+			return (4);
+		case -2:
+			return (5);
+		case -3:
+			return (4);
+		default:
+			return (1);
+		}
+	}
 	return (0);
 }
 
-int FAT_ls(char *path, FAT_filesystem_t *filesystem)
+int FAT_readdir(filesystem_t *filesystem, Directory_t *Directory, dir_entry_t *dir_entry)
 {
 	/*
-	1 > Folder not found
-	2 > Not a directory
-	3 > Invalid path
-	4 > Disk error
+	3 > Disk error
 	*/
 
-	int32_t cluster_id = get_cluster_id(path, filesystem);
-
-	if (cluster_id < 0)
+	FAT_Directory_t *FAT_directory = (FAT_Directory_t *)(Directory->buffer);
+	if (FAT_directory->index == 0)
 	{
-		return (-cluster_id);
+		if (Read_Cluster((Directory->buffer) + sizeof(FAT_Directory_t), (FAT_filesystem_t *)filesystem->filesystem_data, (((FAT_Directory_t *)Directory->buffer)->Cluster_id)))
+		{
+			return (3);
+		}
 	}
 
-	DirEntry_t root_dir[filesystem->cluster_size * (512 / sizeof(DirEntry_t))];
-	pio_read_packet_t pio_read_packet;
-	pio_read_packet.sector_count = filesystem->cluster_size;
-	pio_read_packet.buffer = root_dir;
+	FAT_Dir_Entry_t *Entries = Directory->buffer + sizeof(FAT_Directory_t);
 
-	if (Read_Cluster(&pio_read_packet, filesystem, cluster_id))
+	if (Entries[FAT_directory->index].Name[0] == 0)
 	{
-		while (1)
-			;
+		dir_entry->name[0] = 0;
+		return (0);
 	}
 
-	char name[256];
-	for (uint32_t i = 0; i < filesystem->cluster_size * (512 / sizeof(DirEntry_t)); i++)
+	while (Entries[FAT_directory->index].Attribute0 & FAT_ATTR_VOLUME_LABEL)
 	{
-		if (root_dir[i].Attribute0 & ATTR_VOLUME_LABEL)
+		if (Entries[FAT_directory->index].Name[0] == 0)
 		{
-			continue;
+			return (0);
 		}
-		if (root_dir[i].Name[0] == 0x00)
-		{
-			break;
-		}
-
-		if (root_dir[i].Name[0] == 0xe5)
-		{
-			continue;
-		}
-
-		if (get_entry_name(root_dir, i, name))
-		{
-			continue;
-		}
-
-		print(name);
-		if (root_dir[i].Attribute0 & ATTR_DIRECTORY)
-		{
-			echo('/');
-		}
-
-		echo('\n');
+		FAT_directory->index++;
 	}
 
+	if (get_entry_name(Entries, FAT_directory->index, dir_entry->name))
+	{
+		return (1);
+	}
+
+	dir_entry->type = 0;
+	if (Entries[FAT_directory->index].Attribute0 & FAT_ATTR_DIRECTORY)
+	{
+		dir_entry->type |= dir_entry_ATTR_DIR;
+	}
+
+	FAT_directory->index++;
 	return (0);
 }
 
 int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 {
+
 	/*
 	return cluster id
 	-1 > not found
@@ -124,9 +140,9 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	-3 > invalid path
 	*/
 
-	uint8_t attributes = ATTR_DIRECTORY; // to prevent interpreting files as directories
+	uint8_t attributes = FAT_ATTR_DIRECTORY; // to prevent interpreting files as directories
 
-	DirEntry_t Dir_entries[filesystem->cluster_size * (512 / sizeof(DirEntry_t))];
+	FAT_Dir_Entry_t Dir_entries[filesystem->cluster_size * (512 / sizeof(FAT_Dir_Entry_t))];
 	pio_read_packet_t pio_read_packet;
 	pio_read_packet.buffer = &Dir_entries;
 	pio_read_packet.sector_count = filesystem->cluster_size;
@@ -140,10 +156,9 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	{
 		return (-3);
 	}
-
 	while (path[path_index] != 0)
 	{
-		if (!(attributes & ATTR_DIRECTORY))
+		if (!(attributes & FAT_ATTR_DIRECTORY))
 		{
 			return (-2);
 		}
@@ -162,10 +177,13 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 		}
 		current_path[curent_path_index] = 0;
 
-		Read_Cluster(&pio_read_packet, filesystem, cluster_id);
+		if (Read_Cluster(&Dir_entries, filesystem, cluster_id))
+		{
+			return (-3);
+		}
 
 		char name[256];
-		for (uint32_t i = 0; i < filesystem->cluster_size * (512 / sizeof(DirEntry_t)); i++)
+		for (uint32_t i = 0; i < filesystem->cluster_size * (512 / sizeof(FAT_Dir_Entry_t)); i++)
 		{
 			if (Dir_entries[i].Name[0] == 0)
 			{
@@ -175,7 +193,7 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 			{
 				continue;
 			}
-			if (Dir_entries[i].Attribute0 & ATTR_VOLUME_LABEL)
+			if (Dir_entries[i].Attribute0 & FAT_ATTR_VOLUME_LABEL)
 			{
 				continue;
 			}
@@ -209,11 +227,11 @@ int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)
 	return (cluster_id);
 }
 
-int get_entry_name(DirEntry_t *entries, int32_t id, char *name)
+int get_entry_name(FAT_Dir_Entry_t *entries, int32_t id, char *name)
 {
 	if (id)
 	{
-		if (entries[id - 1].Attribute0 == ATTR_LFN && ((LfnEntry_t *)entries)[id - 1].checksum == lfn_checksum((char *)&entries[id]))
+		if (entries[id - 1].Attribute0 == FAT_ATTR_LFN && ((LfnEntry_t *)entries)[id - 1].checksum == lfn_checksum((char *)&entries[id]))
 		{ // LFN detected
 
 			int8_t offset = 1;
@@ -313,14 +331,20 @@ int get_entry_name(DirEntry_t *entries, int32_t id, char *name)
 	return (0);
 }
 
-int Read_Cluster(pio_read_packet_t *pio_read_packet, FAT_filesystem_t *filesystem, uint32_t Cluster_id)
+int Read_Cluster(void *buffer, FAT_filesystem_t *filesystem, uint32_t Cluster_id)
 {
-	pio_read_packet->LBA = (filesystem->partition->LBA_start + filesystem->cluster_offset + filesystem->cluster_size * Cluster_id) | 0xe0000000;
-	if (ATA_PIO_read(pio_read_packet))
+	/*
+	1 > Error reading
+	*/
+
+	pio_read_packet_t pio_read_packet;
+	pio_read_packet.buffer = buffer;
+	pio_read_packet.LBA = (filesystem->partition.LBA_start + filesystem->cluster_offset + filesystem->cluster_size * Cluster_id) | 0xe0000000;
+	pio_read_packet.sector_count = filesystem->cluster_size;
+	pio_read_packet.sector_count = 1;
+
+	if (ATA_PIO_read(&pio_read_packet))
 	{
-		print("Error reading cluster 0x");
-		hexprint32(Cluster_id);
-		echo('\n');
 		return (1);
 	}
 

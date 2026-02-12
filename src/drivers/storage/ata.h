@@ -12,4 +12,5 @@ typedef struct
 } __attribute__((packed)) pio_read_packet_t;
 
 int ATA_PIO_read(pio_read_packet_t *pio_read_packet);
+uint8_t ATA_get_err();
 uint32_t ATA_init();

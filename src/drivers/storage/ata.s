@@ -4,6 +4,7 @@
 %define secondary_ATA_Ctl_base	0x376
 
 %define primary_ATA_Data		primary_ATA_IO_base + 0
+%define primary_ATA_Error		primary_ATA_IO_base + 1
 %define primary_ATA_sector_count	primary_ATA_IO_base + 2
 %define primary_ATA_LBA_lo		primary_ATA_IO_base + 3
 %define primary_ATA_LBA_mid		primary_ATA_IO_base + 4
@@ -14,6 +15,7 @@
 %define primary_ATA_alternate_status	primary_ATA_Ctl_base + 0
 
 %define secondary_ATA_Data		secondary_ATA_IO_base + 0
+%define secondary_ATA_Error		secondary_ATA_IO_base + 1
 %define secondary_ATA_sector_count	secondary_ATA_IO_base + 2
 %define secondary_ATA_LBA_lo		secondary_ATA_IO_base + 3
 %define secondary_ATA_LBA_mid		secondary_ATA_IO_base + 4
@@ -40,7 +42,8 @@
 	section .text
 
 extern print
-extern hexprint8
+extern echo
+extern hexprint32
 
 global ATA_init
 ATA_init:
@@ -390,7 +393,11 @@ ATA_PIO_read:
 
 	mov	edi, [esi+4]	; destination
 
+	;push	test
+	;call	print
+	;pop	eax
 ATA_PIO_read_loop:
+
 	mov	dx, primary_ATA_Status
 	in	al, dx
 
@@ -419,6 +426,13 @@ ATA_PIO_read_loop:
 
 	mov	eax, 0
 	ret
+
+extern ATA_get_err
+ATA_get_err:
+	mov	dx, primary_ATA_Error
+	in	al, dx
+	ret
+
 
 Error:	; default error handler
 	mov	eax, 1
