@@ -99,10 +99,11 @@ typedef struct LfnEntry
 	uint16_t name2[2];
 } __attribute__((packed)) LfnEntry_t;
 
-void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster);
-void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes0, uint32_t cluster_nb, uint32_t size);
+void make_dir(uint32_t *cluster, uint32_t origin_directory, char *name, uint32_t *next_free_cluster);
+void extend_dir(uint32_t *cluster, uint32_t *next_free_cluster);
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes0, uint32_t cluster_nb, uint32_t size, uint32_t *cluster, uint32_t *next_free_cluster);
 
-void add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t sequence_id);
+int add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t sequence_id);
 uint8_t lfn_checksum(char name[13]);
 
 int format_name(char *name, char formated_name[11]);
@@ -211,12 +212,15 @@ int main()
 	root = (DirEntry_t *)&Clusters[2];
 	FAT[2] = 0x0fffffff;
 
-	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0);
+	add_entry(root, "UNCERTAINTY", ATTR_VOLUME_LABEL, 0, 0, NULL, NULL); // not checking if failed, directory is empty
 	uint32_t next_free_cluster = 3;
 
 	{ // make filesystem
 
-		make_dir(root, "boot", &next_free_cluster); // add BOOT directory
+		{
+			uint32_t two = 2;
+			make_dir(&two, 0, "boot", &next_free_cluster); // add BOOT directory, 2 -> root cluster
+		}
 
 		// Add the kernel to it
 		FILE *file_source_ptr;
@@ -234,7 +238,7 @@ int main()
 		uint32_t cluster_id = next_free_cluster;
 
 		// add entry to parent folder
-		add_entry((DirEntry_t *)&(Clusters[3]), "kernel", ATTR_SYSTEM, next_free_cluster, st.st_size);
+		add_entry((DirEntry_t *)&(Clusters[3]), "kernel", ATTR_SYSTEM, next_free_cluster, st.st_size, NULL, NULL); // not checking if failed, directory is empty
 		while (cluster_id + cluster_nb > next_free_cluster)
 		{
 			FAT[next_free_cluster] = next_free_cluster + 1;
@@ -276,6 +280,8 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 	struct dirent *dir;
 	d = opendir(path);
 
+	uint32_t origin_directory = *cluster;
+
 	if (d)
 	{
 		while ((dir = readdir(d)) != NULL)
@@ -286,7 +292,7 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 				{
 					*(cluster + sizeof(uint32_t)) = *next_free_cluster;
 
-					make_dir((DirEntry_t *)(&Clusters[*cluster]), dir->d_name, next_free_cluster);
+					make_dir(cluster, origin_directory, dir->d_name, next_free_cluster);
 
 					uint32_t i = 0;
 					uint32_t len = strlen(path);
@@ -343,7 +349,11 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 					uint32_t cluster_id = *next_free_cluster;
 
 					// add entry to parent folder
-					add_entry((DirEntry_t *)&(Clusters[*cluster]), dir->d_name, 0, *next_free_cluster, st.st_size);
+					if (add_entry((DirEntry_t *)&(Clusters[*cluster]), dir->d_name, 0, *next_free_cluster, st.st_size, cluster, next_free_cluster))
+					{
+						extend_dir(cluster, next_free_cluster);
+						add_entry((DirEntry_t *)&(Clusters[*cluster]), dir->d_name, 0, *next_free_cluster, st.st_size, cluster, next_free_cluster);
+					}
 					while (cluster_id + cluster_nb > *next_free_cluster)
 					{
 						FAT[*next_free_cluster] = (*next_free_cluster) + 1;
@@ -369,38 +379,35 @@ int copy_dir(char *path, uint32_t *cluster, uint32_t *next_free_cluster)
 	return (0);
 }
 
-void make_dir(DirEntry_t *dir, char *name, uint32_t *next_free_cluster)
+void make_dir(uint32_t *cluster, uint32_t origin_directory, char *name, uint32_t *next_free_cluster)
 {
-	uint32_t parent_cluster_nb;
+	DirEntry_t *dir = (DirEntry_t *)(&Clusters[*cluster]);
 
 	FAT[*next_free_cluster] = 0x0fffffff;
-	add_entry(dir, name, ATTR_DIRECTORY, *next_free_cluster, 0);
-
-	if (*((uint64_t *)&(dir[0].Name)) == 0x202020202020202e) // ASCII of ".       " in a uint64 form
+	if (add_entry(dir, name, ATTR_DIRECTORY, *next_free_cluster, 0, cluster, next_free_cluster))
 	{
-		parent_cluster_nb = dir[0].cluster_nb_high << 16 + dir[0].cluster_nb_low;
-	}
-	else
-	{
-		if (dir[0].Attribute0 == ATTR_VOLUME_LABEL)
-		{
-			parent_cluster_nb = 0;
-		}
-		else
-		{
-			printf("! Error,\n> Invalid parent directory\n");
-		}
+		extend_dir(cluster, next_free_cluster);
+		add_entry(dir, name, ATTR_DIRECTORY, *next_free_cluster, 0, cluster, next_free_cluster);
 	}
 
 	DirEntry_t *new_dir;
 	new_dir = (DirEntry_t *)&Clusters[*next_free_cluster];
-	add_entry(new_dir, ".", ATTR_DIRECTORY, *next_free_cluster, 0);
-	add_entry(new_dir, "..", ATTR_DIRECTORY, parent_cluster_nb, 0);
+	add_entry(new_dir, ".", ATTR_DIRECTORY, *next_free_cluster, 0, cluster, next_free_cluster);
+	add_entry(new_dir, "..", ATTR_DIRECTORY, origin_directory, 0, cluster, next_free_cluster);
 
 	(*next_free_cluster)++;
 }
 
-void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size)
+void extend_dir(uint32_t *cluster, uint32_t *next_free_cluster)
+{
+	FAT[*next_free_cluster] = 0x0fffffff;
+	FAT[*cluster] = *next_free_cluster;
+
+	*cluster = *next_free_cluster;
+	(*next_free_cluster)++;
+}
+
+int add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluster_nb, uint32_t size, uint32_t *cluster, uint32_t *next_free_cluster)
 {
 	uint32_t id = 0;
 	while (dir[id].Name[0] != 0x00)
@@ -408,7 +415,7 @@ void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluste
 		id++;
 		if (id >= (Cluster_size / sizeof(DirEntry_t)))
 		{
-			printf("! Directory is full!\n");
+			return (1);
 		};
 	};
 
@@ -435,7 +442,12 @@ void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluste
 			add_lfn_entry((LfnEntry_t *)dir, &(name[len * 13 - 13]), checksum, 0x40 + len);
 			for (int32_t i = len - 2; i >= 0; i--)
 			{
-				add_lfn_entry((LfnEntry_t *)dir, &(name[i * 13]), checksum, i + 1);
+				if (add_lfn_entry((LfnEntry_t *)dir, &(name[i * 13]), checksum, i + 1))
+				{
+					extend_dir(cluster, next_free_cluster);
+					dir = (DirEntry_t *)&(Clusters[*cluster]);
+					add_lfn_entry((LfnEntry_t *)dir, &(name[i * 13]), checksum, i + 1);
+				}
 			}
 			id += len;
 
@@ -453,9 +465,11 @@ void add_entry(DirEntry_t *dir, char *name, uint8_t atttributes, uint32_t cluste
 	dir[id].cluster_nb_high = cluster_nb >> 16;
 	dir[id].cluster_nb_low = cluster_nb;
 	dir[id].size = size;
+
+	return (0);
 }
 
-void add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t sequence_id)
+int add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t sequence_id)
 {
 	uint32_t id = 0;
 	while (dir[id].sequence_id != 0x00)
@@ -463,7 +477,7 @@ void add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t seq
 		id++;
 		if (id >= (Cluster_size / sizeof(LfnEntry_t)))
 		{
-			printf("! Directory is full!\n");
+			return (1);
 		};
 	};
 
@@ -483,6 +497,8 @@ void add_lfn_entry(LfnEntry_t *dir, char name[13], uint8_t checksum, uint8_t seq
 	{
 		dir[id].name2[i] = name[i + 11];
 	}
+
+	return (0);
 }
 
 uint8_t lfn_checksum(char name[13])
