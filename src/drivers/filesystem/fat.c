@@ -290,7 +290,7 @@ int get_entry_name(FAT_Dir_Entry_t *entries, int32_t id, char *name)
 	uint8_t j = 0;
 	for (j; j < l; j++)
 	{
-		if ('A' <= entries[id].Name[j] < 'Z')
+		if ('A' <= entries[id].Name[j] && entries[id].Name[j] < 'Z')
 		{
 			name[i] = entries[id].Name[j] + Case;
 		}
