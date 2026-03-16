@@ -163,30 +163,6 @@ extern void main()
 		}
 	}
 	echo('\n');
-
-	/*
-	{
-		uint32_t count = 0x9800;
-		uint8_t buffer[512];
-		pio_read_packet_t pio_read_packet;
-		pio_read_packet.sector_count = 1;
-		while (1)
-		{
-			pio_read_packet.buffer = &buffer;
-			pio_read_packet.LBA = count | 0xe0000000;
-			if (ATA_PIO_read(&pio_read_packet))
-			{
-				print("Error\n");
-				while (1)
-					;
-			}
-			hexprint32(count);
-			echo('\n');
-			count++;
-		}
-	}
-	//*/
-
 	shell();
 
 	return;
@@ -211,7 +187,27 @@ int shell()
 			case '\n':
 				input_buffer[input_buffer_index] = 0;
 				input_buffer_index = 0;
-				ls(input_buffer);
+
+				for (uint32_t i = 0; input_buffer[i] != 0; i++)
+				{
+					break;
+					if (input_buffer[i] == ' ')
+					{
+						input_buffer[i] = 0;
+					}
+				}
+				switch (input_buffer[0])
+				{
+				case 'l':
+					ls(input_buffer + 2);
+					break;
+
+				default:
+					cursor_color(0x0c);
+					print("Unknowed function\n\n");
+					cursor_color(0x0f);
+					break;
+				}
 				print(prompt);
 				break;
 
@@ -273,7 +269,7 @@ void ls(char *path)
 				break;
 
 			default:
-				print("Untrueknow error\n");
+				print("Unknow error\n");
 			}
 			cursor_color(0x0f);
 			return;
