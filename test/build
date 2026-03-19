@@ -1,0 +1,15 @@
+export PATH="$HOME/opt/cross/bin:$PATH"
+
+cd test
+if [[ -d bin ]]; then
+	rm -r bin
+fi
+
+mkdir bin
+
+i686-elf-gcc -ffreestanding -m32 -g -c 'hello.c' -o bin/hello.o
+nasm "entry.s" -f elf -o "bin/entry.o"
+
+i686-elf-ld -o ../bin/fs/hello -Ttext 0x00100000 \
+'bin/entry.o' 'bin/hello.o' \
+--oformat binary

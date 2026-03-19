@@ -329,10 +329,6 @@ void run(char *path)
 	void (*program)(void) = (void (*)(void))0x100000;
 
 	fread((void *)(0x100000), 0x100, path);
-	for (uint32_t i = 0; i < 256; i++)
-	{
-		hexprint8(*((uint8_t *)(0x100000 + i)));
-	}
-	print("\n\n");
-	print((char *)(0x100000));
+
+	program();
 }
