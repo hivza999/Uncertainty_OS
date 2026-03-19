@@ -3,6 +3,8 @@
 #include "fat.h"
 #include "filesystem.h"
 
+#include "../display/text.h"
+
 #define FAT_ATTR_READ_ONLY 0x01
 #define FAT_ATTR_HIDDEN 0x02
 #define FAT_ATTR_SYSTEM 0x04
@@ -128,6 +130,11 @@ int FAT_readdir(filesystem_t *filesystem, Directory_t *Directory, dir_entry_t *d
 
 	FAT_directory->index++;
 	return (0);
+}
+
+int FAT_fread(filesystem_t *filesystem, void *buffer, char *path, uint32_t size)
+{
+	Read_Cluster(buffer, (FAT_filesystem_t *)filesystem->filesystem_data, get_cluster_id(path, (FAT_filesystem_t *)filesystem->filesystem_data));
 }
 
 int32_t get_cluster_id(char *path, FAT_filesystem_t *filesystem)

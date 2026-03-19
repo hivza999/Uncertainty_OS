@@ -23,8 +23,9 @@ const uint8_t *keycode_buffer = (uint8_t *)0x90500;
 
 const uint16_t *Disk_ATA_INDETIFY = (uint16_t *)0x90600;
 
-void ls(char *path);
 int shell();
+void run(char *path);
+void ls(char *path);
 
 extern void main()
 {
@@ -202,6 +203,10 @@ int shell()
 					ls(input_buffer + 2);
 					break;
 
+				case 'r':
+					run(input_buffer + 2);
+					break;
+
 				default:
 					cursor_color(0x0c);
 					print("Unknowed function\n\n");
@@ -317,4 +322,17 @@ void ls(char *path)
 	}
 
 	echo('\n');
+}
+
+void run(char *path)
+{
+	void (*program)(void) = (void (*)(void))0x100000;
+
+	fread((void *)(0x100000), 0x100, path);
+	for (uint32_t i = 0; i < 256; i++)
+	{
+		hexprint8(*((uint8_t *)(0x100000 + i)));
+	}
+	print("\n\n");
+	print((char *)(0x100000));
 }

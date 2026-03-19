@@ -85,3 +85,16 @@ int readdir(Directory_t *Directory, dir_entry_t *dir_entry)
 	}
 	return (2);
 }
+
+int fread(void *buffer, uint32_t size, char *path)
+{
+	/*
+	No filesystem
+	*/
+
+	if (filesystem.type == FS_FAT)
+	{
+		return (FAT_fread(&filesystem, buffer, path, size));
+	}
+	return (2);
+}

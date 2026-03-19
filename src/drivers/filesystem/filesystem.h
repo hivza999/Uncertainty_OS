@@ -25,3 +25,4 @@ int filesystem_init(partition_t *partition);
 
 int opendir(Directory_t *Directory, char *path);
 int readdir(Directory_t *Directory, dir_entry_t *dir_entry);
+int fread(void *buffer, uint32_t size, char *path);

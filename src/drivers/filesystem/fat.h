@@ -19,3 +19,4 @@ typedef struct
 
 int FAT_opendir(filesystem_t *filesystem, Directory_t *Directory, char *path);
 int FAT_readdir(filesystem_t *filesystem, Directory_t *Directory, dir_entry_t *dir_entry);
+int FAT_fread(filesystem_t *filesystem, void *buffer, char *path, uint32_t size);
